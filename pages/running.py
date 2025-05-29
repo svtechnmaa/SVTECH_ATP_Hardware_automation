@@ -11,7 +11,7 @@ from jnpr.junos import Device, exception
 import re
 
 ex = Experiment("provision_pipeline", base_dir=".")
-sys.path.append("/opt/SVTECH-Junos-Automation/Python-Development/atp_hardware_tool/VNPT.v3")
+sys.path.append("/opt/SVTECH-Junos-Automation/Python-Development/atp_hardware_tool/VNPT.v4")
 import phase1_1
 import phase1_2
 import phase2_1
