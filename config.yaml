@@ -1,0 +1,116 @@
+input_vars:
+  '1.1':
+    hopdong:
+      widget: file_uploader
+      placeholder: Upload file hopdong archive (.zip, .rar, .tar.gz)
+      accept_value:
+        - zip
+        - rar
+        - tar.gz
+      label: Upload file hopdong
+    ip:
+      widget: file_uploader
+      placeholder: Upload file xlsx mapping Hostname - IP Loopback
+      accept_value:
+        - xlsx
+        - csv
+      label: Upload file IP
+    ip_sheet:
+      widget: empty
+    mapping:
+      widget: file_uploader
+      placeholder: Upload file xlsx mapping Hostname - BBBG
+      accept_value:
+        - xlsx
+        - csv
+      label: Upload file mapping
+    mapping_sheet:
+      widget: empty
+    template:
+      widget: file_uploader
+      placeholder: Upload file ATP template
+      accept_value:
+        - doc
+        - docx
+      label: Upload file template
+    wipe_atp:
+      widget: checkbox
+      default: No
+      placeholder: Wipe folder ATP result if name HD already exist
+      label: Wipe ATP folder
+  '1.2':
+    hopdong:
+      widget: selectbox
+      accept_value: []
+      label: List hop dong
+    planningSN:
+      widget: file_uploader
+      placeholder: Upload file xlsx planning for Hostname - SN - Slot
+      accept_value:
+        - xlsx
+        - csv
+      label: Upload file planning SN
+    planningSN_sheet:
+      widget: empty
+  '2.1':
+    hopdong:
+      widget: selectbox
+      accept_value: []
+      label: List hop dong
+    list_bbbg:
+      widget: multiselect
+      accept_value: []
+      label: List BBBG
+      default: []
+    username:
+      widget: text_input
+      label: Login username
+      default: ''
+      type: default
+    password:
+      widget: text_input
+      label: Login password
+      default: ''
+      type: password
+  '2.2':
+    hopdong:
+      widget: selectbox
+      accept_value: []
+      label: List hop dong
+    hostname:
+      widget: selectbox
+      accept_value: []
+      label: List Hosts
+    hostslot:
+      widget: multiselect
+      accept_value: []
+      label: List SN
+      default: []
+    username:
+      widget: text_input
+      label: Login username
+      default: ''
+      type: default
+    password:
+      widget: text_input
+      label: Login password
+      default: ''
+      type: password
+    reboot:
+      widget: checkbox
+      default: No
+      label: Reboot card
+  '2.3':
+    hopdong:
+      widget: selectbox
+      accept_value: []
+      label: List hop dong
+    list_bbbg:
+      widget: multiselect
+      accept_value: []
+      label: List BBBG
+      default: []
+OUTPUT_DIR: /opt/ATP_output_result
+DB_NAME: database.sqlite
+TEMP_EXTRACT_HD: /var/tmp/atp_vnpt
+DB_LOG: log_data.sqlite
