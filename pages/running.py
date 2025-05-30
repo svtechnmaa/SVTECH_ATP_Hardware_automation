@@ -161,9 +161,9 @@ if ('running' in st.session_state and st.session_state.running) or 'run_id' in s
     if 'running' in st.session_state and st.session_state.running:
         st.header(f"Runing Job Phase {st.session_state.running_job}")
     elif 'run_id' in st.query_params:
-        run_data=get_a_run(log_db_path, st.query_params['run_id'][0])
+        run_data=get_a_run(log_db_path, st.query_params['run_id'])
         phase=re.search(r'run_phase(\d+_\d+)', run_data['command']).group(1).replace('_','.')
-        st.header(f"Runned Job #{st.query_params['run_id'][0]} Phase {phase}")
+        st.header(f"Runned Job #{st.query_params['run_id']} Phase {phase}")
     input_container, padding, output_container = st.columns([3, 0.2, 6.8])
     with input_container:
         st.subheader("Input")

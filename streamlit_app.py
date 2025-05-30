@@ -49,7 +49,7 @@ for phase, vars in all_phase.items():
     )
     pages_list.append(product_page)
 pages_list.append(st.Page("pages/running.py", title="Run job"))
-pages_list.append(st.Page("pages/dashboard.py", title="Dashboard"))
+pages_list.append(st.Page("pages/dashboard.py", title="Summary"))
 st.set_page_config(layout="wide")
 pg = st.navigation(pages_list)
 pg.run()

@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import sqlite3
 import pandas as pd
 import json
+from glob import glob
 # from sacred import Experiment
 # from sacred.observers import FileStorageObserver, SqlObserver
 # ex = Experiment("provision_pipeline")
@@ -29,20 +30,24 @@ def create_input_component(input_vars, phase, values={}):
                 else:
                     st.session_state[f'input_data_phase_{phase}'][name] = st.file_uploader(config['label'], type=config['accept_value'], key=key)
             case 'selectbox':
-                if f'{phase}_{name}_options' not in st.session_state:
-                    st.session_state[f'{phase}_{name}_options'] = config['accept_value']
-                index=0
                 if values:
-                    index=st.session_state[f'{phase}_{name}_options'].index(values[name])
-                elif 'default' in config:
-                    index=st.session_state[f'{phase}_{name}_options'].index(config['default'])
-                st.session_state[f'input_data_phase_{phase}'][name] = st.selectbox(config['label'], options=st.session_state[f'{phase}_{name}_options'], key=key, index=index, disabled=bool(values))
+                    st.session_state[f'input_data_phase_{phase}'][name] = st.selectbox(config['label'], options=[values[name]], key=key, disabled=True)
+                else:
+                    if f'{phase}_{name}_options' not in st.session_state:
+                        st.session_state[f'{phase}_{name}_options'] = config['accept_value']
+                    index=0
+                    if 'default' in config:
+                        index=st.session_state[f'{phase}_{name}_options'].index(config['default'])
+                    st.session_state[f'input_data_phase_{phase}'][name] = st.selectbox(config['label'], options=st.session_state[f'{phase}_{name}_options'], key=key, index=index)
             case 'text_input':
                 st.session_state[f'input_data_phase_{phase}'][name] = st.text_input(config['label'], value=values[name] if values else config['default'], key=key, disabled=bool(values), type=config['type'])
             case 'multiselect':
-                if f'{phase}_{name}_options' not in st.session_state:
-                    st.session_state[f'{phase}_{name}_options'] = config['accept_value']
-                st.session_state[f'input_data_phase_{phase}'][name] = st.multiselect(config['label'], options=st.session_state[f'{phase}_{name}_options'], key=key, default=values[name] if values else config['default'], disabled=bool(values))
+                if values:
+                    st.session_state[f'input_data_phase_{phase}'][name] = st.multiselect(config['label'], options=values[name], key=key, default=values[name], disabled=True)
+                else:
+                    if f'{phase}_{name}_options' not in st.session_state:
+                        st.session_state[f'{phase}_{name}_options'] = config['accept_value']
+                    st.session_state[f'input_data_phase_{phase}'][name] = st.multiselect(config['label'], options=st.session_state[f'{phase}_{name}_options'], key=key, default=config['default'])
             case 'checkbox':
                 st.session_state[f'input_data_phase_{phase}'][name] = st.checkbox(config['label'], key=key, value=values[name] if values else config['default'], disabled=bool(values))
             case 'number_input':
@@ -279,6 +284,7 @@ def get_list_run(database, phase):
         df['stop_time'] = pd.to_datetime(df['stop_time'])
         df['duration'] = df['stop_time'] - df['start_time']
         df['run_time'] = df['start_time'].dt.strftime('%-m/%-d/%y %-I:%M %p').str.lower() +" in " +df['duration'].apply(format_duration)
+        df = df.sort_values(by='start_time', ascending=False)  # Sort by start_time in descending order
         return df
     return pd.DataFrame()
 
