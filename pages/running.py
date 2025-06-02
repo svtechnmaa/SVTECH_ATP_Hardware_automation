@@ -257,7 +257,7 @@ if ('running' in st.session_state and st.session_state.running) or 'run_id' in s
                     "hostname": st.session_state['input_data_phase_2.2']['hostname'],
                     "hopdong": st.session_state['input_data_phase_2.2']['hopdong'],
                     "hostslot": st.session_state['input_data_phase_2.2']['hostslot'],
-                    "request_reboot": 'YES' if st.session_state['input_data_phase_2.2']['reboot'] else 'NO',
+                    "request_reboot": 'YES' if st.session_state['input_data_phase_2.2']['request_reboot'] else 'NO',
                 }
             elif st.session_state.running_job == '2.3':
                 ex.observers = [sql_observer]

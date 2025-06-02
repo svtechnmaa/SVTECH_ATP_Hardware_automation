@@ -16,7 +16,7 @@ from glob import glob
 # sql_observer = SqlObserver('sqlite:///database.sqlite')
 
 def read_conf():
-    with open("/opt/SVTECH-Junos-Automation/Python-Development/atp_hardware_tool/streamlit/config.yaml", "r") as f:
+    with open(os.environ.get("CONFIG_FILE"), "r") as f:
         config = yaml.safe_load(f)
     return config
 
@@ -49,6 +49,7 @@ def create_input_component(input_vars, phase, values={}):
                         st.session_state[f'{phase}_{name}_options'] = config['accept_value']
                     st.session_state[f'input_data_phase_{phase}'][name] = st.multiselect(config['label'], options=st.session_state[f'{phase}_{name}_options'], key=key, default=config['default'])
             case 'checkbox':
+                print(111, name, values)
                 st.session_state[f'input_data_phase_{phase}'][name] = st.checkbox(config['label'], key=key, value=values[name] if values else config['default'], disabled=bool(values))
             case 'number_input':
                 st.session_state[f'input_data_phase_{phase}'][name] = st.number_input(config['label'], key=key, value=values[name] if values else config['default'], disabled=bool(values), min_value=config['min_value'], max_value=config['max_value'], step=config['step'])

@@ -1,0 +1,7 @@
+junos_eznc==2.6.7
+openpyxl==3.1.2
+pandas==2.2.3
+PyYAML==6.0.2
+rarfile==4.1
+sacred==0.8.7
+streamlit==1.45.1

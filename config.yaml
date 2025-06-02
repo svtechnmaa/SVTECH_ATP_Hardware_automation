@@ -96,7 +96,7 @@ input_vars:
       label: Login password
       default: ''
       type: password
-    reboot:
+    request_reboot:
       widget: checkbox
       default: No
       label: Reboot card
