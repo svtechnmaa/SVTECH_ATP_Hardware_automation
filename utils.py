@@ -233,37 +233,29 @@ class TimestampStdoutWrapper:
         self.original_stdout.flush()
 
 def get_list_hd(database):
-    if os.path.isfile(database):
-        conn = sqlite3.connect(database)
-        df=pd.read_sql_query("SELECT distinct(ma_HD) from checkSN" , conn)
-        return df['ma_HD'].tolist()
-    return []
+    conn = sqlite3.connect(database)
+    df=pd.read_sql_query("SELECT distinct(ma_HD) from checkSN" , conn)
+    return df['ma_HD'].tolist()
     # st.session_state[f'{phase}_hopdong_options'] = df['ma_HD'].tolist()
 
 def get_list_bbbg(database, hd):
-    if os.path.isfile(database):
-        conn = sqlite3.connect(database)
-        df=pd.read_sql_query("SELECT tail FROM 'BBBG' where ma_HD=(?)" , conn, params=(hd,))
-        return df['tail'].unique().tolist()
-    return []
+    conn = sqlite3.connect(database)
+    df=pd.read_sql_query("SELECT tail FROM 'BBBG' where ma_HD=(?)" , conn, params=(hd,))
+    return df['tail'].unique().tolist()
     # st.session_state[f'{phase}_list_bbbg_options'] = df['tail'].unique().tolist()
 
 def get_list_host(database, hd):
-    if os.path.isfile(database):
-        conn = sqlite3.connect(database)
-        df=pd.read_sql_query("SELECT Hostname FROM 'BBBG' where ma_HD=(?)" , conn, params=(hd,))
-        return df['Hostname'].unique().tolist()
-    return []
+    conn = sqlite3.connect(database)
+    df=pd.read_sql_query("SELECT Hostname FROM 'BBBG' where ma_HD=(?)" , conn, params=(hd,))
+    return df['Hostname'].unique().tolist()
     # st.session_state[f'{phase}_hostname_options'] = df['Hostname'].unique().tolist()
 
 def get_list_sn(database, hd, host):
-    if os.path.isfile(database):
-        conn = sqlite3.connect(database)
-        df=pd.read_sql_query("SELECT Hostname, RealSlot, TestStatus, SN, Type FROM 'checkSN' where RealSlot IS NOT NULL and TestStatus IN ('Installed','Checked without reboot', 'Checked with reboot','Checked') and Hostname=(?) and Type in ('fpc','module','lca') and ma_HD=(?)" , conn, params=(host,hd))
-        df['RealSlot'] = df['RealSlot'].apply(str)
-        df['host-slot'] = df['Hostname']+' - '+df['Type']+ ' '+df['SN']+' - Slot ' + df['RealSlot']+' - '+df['TestStatus']
-        return df['host-slot'].unique().tolist()
-    return []
+    conn = sqlite3.connect(database)
+    df=pd.read_sql_query("SELECT Hostname, RealSlot, TestStatus, SN, Type FROM 'checkSN' where RealSlot IS NOT NULL and TestStatus IN ('Installed','Checked without reboot', 'Checked with reboot','Checked') and Hostname=(?) and Type in ('fpc','module','lca') and ma_HD=(?)" , conn, params=(host,hd))
+    df['RealSlot'] = df['RealSlot'].apply(str)
+    df['host-slot'] = df['Hostname']+' - '+df['Type']+ ' '+df['SN']+' - Slot ' + df['RealSlot']+' - '+df['TestStatus']
+    return df['host-slot'].unique().tolist()
     # st.session_state[f'{phase}_hostslot_options'] = df['host-slot'].unique().tolist()
 
 def get_statistics(database, phase):
