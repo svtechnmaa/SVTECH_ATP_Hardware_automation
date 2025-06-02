@@ -5,3 +5,4 @@ PyYAML==6.0.2
 rarfile==4.1
 sacred==0.8.7
 streamlit==1.45.1
+SQLAlchemy==2.0.40
