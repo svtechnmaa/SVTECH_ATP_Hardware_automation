@@ -49,7 +49,6 @@ def create_input_component(input_vars, phase, values={}):
                         st.session_state[f'{phase}_{name}_options'] = config['accept_value']
                     st.session_state[f'input_data_phase_{phase}'][name] = st.multiselect(config['label'], options=st.session_state[f'{phase}_{name}_options'], key=key, default=config['default'])
             case 'checkbox':
-                print(111, name, values)
                 st.session_state[f'input_data_phase_{phase}'][name] = st.checkbox(config['label'], key=key, value=values[name] if values else config['default'], disabled=bool(values))
             case 'number_input':
                 st.session_state[f'input_data_phase_{phase}'][name] = st.number_input(config['label'], key=key, value=values[name] if values else config['default'], disabled=bool(values), min_value=config['min_value'], max_value=config['max_value'], step=config['step'])
@@ -150,8 +149,10 @@ def render_phase_page(phase, vars, statistics={}, list_runs=pd.DataFrame()):
     create_input_component(input_vars=vars, phase=phase)
     create_sheet_components(vars, phase)
     if st.button(":star2: **RUN**", use_container_width=True, disabled=st.session_state.get('running', False) or not all(st.session_state[f'input_data_phase_{phase}'].get(name) not in [None, '', []] for name in vars.keys())):
+        st.session_state.logger=StreamlitLogger()
         st.session_state.running = True
         st.session_state.running_job = phase
+        st.session_state.current_running=False
         st.switch_page('pages/running.py')
     st.title(f"Statistics")
     cols = st.columns(3)
@@ -215,6 +216,7 @@ class StreamlitLogger:
     def get_html(self):
         with self.lock:
             return "<br>".join(self.lines)
+
 
 class TimestampStdoutWrapper:
     def __init__(self, original_stdout, streamlit_logger):

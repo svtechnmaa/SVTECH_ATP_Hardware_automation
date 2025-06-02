@@ -180,103 +180,108 @@ if ('running' in st.session_state and st.session_state.running) or 'run_id' in s
     with output_container:
         st.subheader("Output")
         log_placeholder = st.empty()
-        logger = StreamlitLogger()
-        stop_event = threading.Event()
+        if not 'stop_event' in st.session_state:
+            st.session_state.stop_event = threading.Event()
+        # stop_event = threading.Event()
         tmp_output_dir = os.path.join(conf['TEMP_EXTRACT_HD'], 'extracted')
         if 'running' in st.session_state and st.session_state.running:
-            if st.session_state.running_job == '1.1':
-                ex.observers = [sql_observer]
-                base_name, file_extension = os.path.splitext(st.session_state['input_data_phase_1.1']['hopdong'].name)
-                DELETE_DIR(tmp_output_dir)
-                CREATE_EXPORT_DIR(tmp_output_dir)
-                if file_extension == '.tar':
-                    extract_tar(st.session_state['input_data_phase_1.1']['hopdong'].getvalue(), tmp_output_dir)
-                elif file_extension == '.tar.gz' or file_extension == '.tgz':
-                    extract_tar_gz(st.session_state['input_data_phase_1.1']['hopdong'].getvalue(), tmp_output_dir)
-                elif file_extension == '.zip':
-                    extract_zip(st.session_state['input_data_phase_1.1']['hopdong'].getvalue(), tmp_output_dir)
-                elif file_extension == '.rar':
-                    extract_rar(st.session_state['input_data_phase_1.1']['hopdong'].getvalue(), tmp_output_dir)
-                else:
-                    raise ValueError(f"Unsupported file extension: {file_extension}")
-                file_ip=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1']['ip'].name)
-                with open(file_ip, "wb") as f:
-                    f.write(st.session_state['input_data_phase_1.1']['ip'].getbuffer())
-                file_mapping=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1']['mapping'].name)
-                with open(file_mapping, "wb") as f:
-                    f.write(st.session_state['input_data_phase_1.1']['mapping'].getbuffer())
-                file_template=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1']['template'].name)
-                with open(file_template, "wb") as f:
-                    f.write(st.session_state['input_data_phase_1.1']['template'].getbuffer())
-                file_name = os.path.basename(base_name)
-                output_dir = os.path.join(conf['OUTPUT_DIR'], file_name)
-                if st.session_state['input_data_phase_1.1']['wipe_atp'] and os.path.exists(os.path.join(output_dir, 'ATP')):
-                    DELETE_DIR(os.path.join(output_dir, 'ATP'))
-                for f in [output_dir, os.path.join(output_dir, 'ATP'), os.path.join(output_dir, 'ATP Template'), os.path.join(output_dir, 'RAW LOG')]:
-                    CREATE_EXPORT_DIR(f)
-                config_updates = {
-                    "hopdong": os.path.join(tmp_output_dir, file_name),
-                    "ip": file_ip,
-                    "mapping": file_mapping,
-                    "output_dir": conf['OUTPUT_DIR'],
-                    "database_name": conf['DB_NAME'],
-                    "template": file_template,
-                    "ip_sheet": st.session_state['input_data_phase_1.1']['ip_sheet'],
-                    "mapping_sheet": st.session_state['input_data_phase_1.1']['mapping_sheet'],
-                    'wipe_atp': st.session_state['input_data_phase_1.1']['wipe_atp']
-                }
-            elif st.session_state.running_job == '1.2':
-                ex.observers = [sql_observer]
-                file_planning=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.2']['planningSN'].name)
-                with open(file_planning, "wb") as f:
-                    f.write(st.session_state['input_data_phase_1.2']['planningSN'].getbuffer())
-                config_updates={
-                    "output_dir": conf['OUTPUT_DIR'],
-                    "database_name": conf['DB_NAME'],
-                    "planningSN": file_planning,
-                    "planningSN_sheet": st.session_state['input_data_phase_1.2']['planningSN_sheet'],
-                    "hopdong": st.session_state['input_data_phase_1.2']['hopdong'],
-                }
-            elif st.session_state.running_job == '2.1':
-                ex.observers = [sql_observer]
-                config_updates={
-                    "output_dir": conf['OUTPUT_DIR'],
-                    "database_name": conf['DB_NAME'],
-                    "password": st.session_state['input_data_phase_2.1']['password'],
-                    "username": st.session_state['input_data_phase_2.1']['username'],
-                    "list_bbbg": st.session_state['input_data_phase_2.1']['list_bbbg'],
-                    "hopdong": st.session_state['input_data_phase_2.1']['hopdong'],
-                }
-            elif st.session_state.running_job == '2.2':
-                ex.observers = [sql_observer]
-                config_updates={
-                    "output_dir": conf['OUTPUT_DIR'],
-                    "database_name": conf['DB_NAME'],
-                    "password": st.session_state['input_data_phase_2.2']['password'],
-                    "username": st.session_state['input_data_phase_2.2']['username'],
-                    "hostname": st.session_state['input_data_phase_2.2']['hostname'],
-                    "hopdong": st.session_state['input_data_phase_2.2']['hopdong'],
-                    "hostslot": st.session_state['input_data_phase_2.2']['hostslot'],
-                    "request_reboot": 'YES' if st.session_state['input_data_phase_2.2']['request_reboot'] else 'NO',
-                }
-            elif st.session_state.running_job == '2.3':
-                ex.observers = [sql_observer]
-                config_updates={
-                    "output_dir": conf['OUTPUT_DIR'],
-                    "list_bbbg": st.session_state['input_data_phase_2.3']['list_bbbg'],
-                    "hopdong": st.session_state['input_data_phase_2.3']['hopdong'],
-                }
-            thread = threading.Thread(target=run_experiment, args=(ex, config_updates, logger, stop_event, st.session_state.running_job))
-            thread.start()
-
+            if not st.session_state.current_running:
+                st.session_state.current_running=True
+                if st.session_state.running_job == '1.1':
+                    ex.observers = [sql_observer]
+                    base_name, file_extension = os.path.splitext(st.session_state['input_data_phase_1.1']['hopdong'].name)
+                    DELETE_DIR(tmp_output_dir)
+                    CREATE_EXPORT_DIR(tmp_output_dir)
+                    if file_extension == '.tar':
+                        extract_tar(st.session_state['input_data_phase_1.1']['hopdong'].getvalue(), tmp_output_dir)
+                    elif file_extension == '.tar.gz' or file_extension == '.tgz':
+                        extract_tar_gz(st.session_state['input_data_phase_1.1']['hopdong'].getvalue(), tmp_output_dir)
+                    elif file_extension == '.zip':
+                        extract_zip(st.session_state['input_data_phase_1.1']['hopdong'].getvalue(), tmp_output_dir)
+                    elif file_extension == '.rar':
+                        extract_rar(st.session_state['input_data_phase_1.1']['hopdong'].getvalue(), tmp_output_dir)
+                    else:
+                        raise ValueError(f"Unsupported file extension: {file_extension}")
+                    file_ip=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1']['ip'].name)
+                    with open(file_ip, "wb") as f:
+                        f.write(st.session_state['input_data_phase_1.1']['ip'].getbuffer())
+                    file_mapping=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1']['mapping'].name)
+                    with open(file_mapping, "wb") as f:
+                        f.write(st.session_state['input_data_phase_1.1']['mapping'].getbuffer())
+                    file_template=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1']['template'].name)
+                    with open(file_template, "wb") as f:
+                        f.write(st.session_state['input_data_phase_1.1']['template'].getbuffer())
+                    file_name = os.path.basename(base_name)
+                    output_dir = os.path.join(conf['OUTPUT_DIR'], file_name)
+                    if st.session_state['input_data_phase_1.1']['wipe_atp'] and os.path.exists(os.path.join(output_dir, 'ATP')):
+                        DELETE_DIR(os.path.join(output_dir, 'ATP'))
+                    for f in [output_dir, os.path.join(output_dir, 'ATP'), os.path.join(output_dir, 'ATP Template'), os.path.join(output_dir, 'RAW LOG')]:
+                        CREATE_EXPORT_DIR(f)
+                    config_updates = {
+                        "hopdong": os.path.join(tmp_output_dir, file_name),
+                        "ip": file_ip,
+                        "mapping": file_mapping,
+                        "output_dir": conf['OUTPUT_DIR'],
+                        "database_name": conf['DB_NAME'],
+                        "template": file_template,
+                        "ip_sheet": st.session_state['input_data_phase_1.1']['ip_sheet'],
+                        "mapping_sheet": st.session_state['input_data_phase_1.1']['mapping_sheet'],
+                        'wipe_atp': st.session_state['input_data_phase_1.1']['wipe_atp']
+                    }
+                elif st.session_state.running_job == '1.2':
+                    ex.observers = [sql_observer]
+                    file_planning=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.2']['planningSN'].name)
+                    with open(file_planning, "wb") as f:
+                        f.write(st.session_state['input_data_phase_1.2']['planningSN'].getbuffer())
+                    config_updates={
+                        "output_dir": conf['OUTPUT_DIR'],
+                        "database_name": conf['DB_NAME'],
+                        "planningSN": file_planning,
+                        "planningSN_sheet": st.session_state['input_data_phase_1.2']['planningSN_sheet'],
+                        "hopdong": st.session_state['input_data_phase_1.2']['hopdong'],
+                    }
+                elif st.session_state.running_job == '2.1':
+                    ex.observers = [sql_observer]
+                    config_updates={
+                        "output_dir": conf['OUTPUT_DIR'],
+                        "database_name": conf['DB_NAME'],
+                        "password": st.session_state['input_data_phase_2.1']['password'],
+                        "username": st.session_state['input_data_phase_2.1']['username'],
+                        "list_bbbg": st.session_state['input_data_phase_2.1']['list_bbbg'],
+                        "hopdong": st.session_state['input_data_phase_2.1']['hopdong'],
+                    }
+                elif st.session_state.running_job == '2.2':
+                    ex.observers = [sql_observer]
+                    config_updates={
+                        "output_dir": conf['OUTPUT_DIR'],
+                        "database_name": conf['DB_NAME'],
+                        "password": st.session_state['input_data_phase_2.2']['password'],
+                        "username": st.session_state['input_data_phase_2.2']['username'],
+                        "hostname": st.session_state['input_data_phase_2.2']['hostname'],
+                        "hopdong": st.session_state['input_data_phase_2.2']['hopdong'],
+                        "hostslot": st.session_state['input_data_phase_2.2']['hostslot'],
+                        "request_reboot": 'YES' if st.session_state['input_data_phase_2.2']['request_reboot'] else 'NO',
+                    }
+                elif st.session_state.running_job == '2.3':
+                    ex.observers = [sql_observer]
+                    config_updates={
+                        "output_dir": conf['OUTPUT_DIR'],
+                        "list_bbbg": st.session_state['input_data_phase_2.3']['list_bbbg'],
+                        "hopdong": st.session_state['input_data_phase_2.3']['hopdong'],
+                    }
+                thread = threading.Thread(target=run_experiment, args=(ex, config_updates, st.session_state.logger, st.session_state.stop_event, st.session_state.running_job))
+                thread.start()
+            else:
+                pass
             # Periodically update the UI while the thread is running
-            while not stop_event.is_set():
+            while not st.session_state.stop_event.is_set():
                 time.sleep(0.1)  # Adjust the refresh rate as needed
-                html = show_scrollable_log(logger.get_html(), 70)
+                html = show_scrollable_log(st.session_state.logger.get_html(), 70)
                 log_placeholder.markdown(html, unsafe_allow_html=True)
 
-            html = show_scrollable_log(logger.get_html(), 70)
+            html = show_scrollable_log(st.session_state.logger.get_html(), 70)
             log_placeholder.markdown(html, unsafe_allow_html=True)
+            del st.session_state['stop_event']
             st.session_state.running = False
         elif 'run_id' in st.query_params:
             log_content = run_data['captured_out']
