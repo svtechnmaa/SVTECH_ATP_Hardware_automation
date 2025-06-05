@@ -8,3 +8,4 @@ rarfile==4.1
 sacred==0.8.7
 yamllint==1.33.0
 SQLAlchemy==2.0.40
+streamlit==1.45.1
