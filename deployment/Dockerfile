@@ -10,4 +10,4 @@ WORKDIR /opt/SVTECH_ATP_Hardware_automation
 RUN pip install --no-cache-dir -r deployment/requirements.txt
 RUN mkdir -p /opt/ATP_output_result
 EXPOSE 8501
-CMD ["streamlit", "run", "/opt/SVTECH_ATP_Hardware_automation/streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "/opt/SVTECH_ATP_Hardware_automation/streamlit/streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
