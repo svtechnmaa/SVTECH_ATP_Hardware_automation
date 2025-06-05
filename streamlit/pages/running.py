@@ -1,5 +1,4 @@
 import streamlit as st
-from utils import *
 import os
 import sys
 from sacred import Experiment
@@ -9,15 +8,22 @@ import threading
 import time
 from jnpr.junos import Device, exception
 import re
-
-ex = Experiment("provision_pipeline", base_dir=".")
-sys.path.append("/opt/SVTECH-Junos-Automation/Python-Development/atp_hardware_tool/VNPT.v4")
+current_script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root_dir = os.path.abspath(os.path.join(current_script_dir, '..', '..'))
+utils_dir_path = os.path.join(project_root_dir, 'utils')
+if utils_dir_path not in sys.path:
+    sys.path.insert(0, utils_dir_path)
+vnpt_v4_path = os.path.join(project_root_dir, 'src', 'VNPT.v4')
+if vnpt_v4_path not in sys.path:
+    sys.path.insert(0, vnpt_v4_path)
+from streamlit_utils import *
 import phase1_1
 import phase1_2
 import phase2_1
 import phase2_2
 import phase2_3
 
+ex = Experiment("provision_pipeline", base_dir=".")
 def run_experiment(ex, config_updates, logger, stop_event, phase):
     sys.stdout = TimestampStdoutWrapper(sys.__stdout__, logger)
     try:
@@ -29,13 +35,14 @@ def run_experiment(ex, config_updates, logger, stop_event, phase):
         stop_event.set()
 
 @ex.command
-def run_phase1_1(hopdong, ip, mapping, output_dir, database_name, template, ip_sheet, mapping_sheet, wipe_atp):
+def run_phase1_1(hopdong, ip, mapping, output_dir, database_name, template, ip_sheet, mapping_sheet, wipe_atp, signning, signning_sheet):
     ex.observers = [sql_observer]
     print("[run_phase1_1] Starting...")
     try:
         bbbg = phase1_1.parse_BBBG(hopdong)
         ip_df, mapping_df = phase1_1.parse_mapping(ip, mapping, output_dir, mapping_sheet, ip_sheet)
-        phase1_1.save_sqlite(output_dir, database_name, bbbg, ip_df, mapping_df)
+        sign_df=phase1_1.parse_signning(signning_file=signning, signning_sheet=signning_sheet, header_index=2)
+        phase1_1.save_sqlite(output_dir, database_name, bbbg, ip_df, mapping_df, sign_df)
         phase1_1.generate_atp(template, output_dir, hopdong.split("/")[-1], database_name, hopdong)
         print('Done')
         return 1
@@ -182,7 +189,6 @@ if ('running' in st.session_state and st.session_state.running) or 'run_id' in s
         log_placeholder = st.empty()
         if not 'stop_event' in st.session_state:
             st.session_state.stop_event = threading.Event()
-        # stop_event = threading.Event()
         tmp_output_dir = os.path.join(conf['TEMP_EXTRACT_HD'], 'extracted')
         if 'running' in st.session_state and st.session_state.running:
             if not st.session_state.current_running:
@@ -202,15 +208,21 @@ if ('running' in st.session_state and st.session_state.running) or 'run_id' in s
                         extract_rar(st.session_state['input_data_phase_1.1']['hopdong'].getvalue(), tmp_output_dir)
                     else:
                         raise ValueError(f"Unsupported file extension: {file_extension}")
-                    file_ip=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1']['ip'].name)
-                    with open(file_ip, "wb") as f:
-                        f.write(st.session_state['input_data_phase_1.1']['ip'].getbuffer())
-                    file_mapping=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1']['mapping'].name)
-                    with open(file_mapping, "wb") as f:
-                        f.write(st.session_state['input_data_phase_1.1']['mapping'].getbuffer())
-                    file_template=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1']['template'].name)
-                    with open(file_template, "wb") as f:
-                        f.write(st.session_state['input_data_phase_1.1']['template'].getbuffer())
+                    file_uploaded={}
+                    for i in ['ip', 'mapping', 'signning', 'template']:
+                        if i in st.session_state['input_data_phase_1.1'] and st.session_state['input_data_phase_1.1'][i] is not None:
+                            file_uploaded[i]=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1'][i].name)
+                            with open(file_uploaded[i], "wb") as f:
+                                f.write(st.session_state['input_data_phase_1.1'][i].getbuffer())
+                    # file_ip=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1']['ip'].name)
+                    # with open(file_ip, "wb") as f:
+                    #     f.write(st.session_state['input_data_phase_1.1']['ip'].getbuffer())
+                    # file_mapping=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1']['mapping'].name)
+                    # with open(file_mapping, "wb") as f:
+                    #     f.write(st.session_state['input_data_phase_1.1']['mapping'].getbuffer())
+                    # file_template=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1']['template'].name)
+                    # with open(file_template, "wb") as f:
+                    #     f.write(st.session_state['input_data_phase_1.1']['template'].getbuffer())
                     file_name = os.path.basename(base_name)
                     output_dir = os.path.join(conf['OUTPUT_DIR'], file_name)
                     if st.session_state['input_data_phase_1.1']['wipe_atp'] and os.path.exists(os.path.join(output_dir, 'ATP')):
@@ -219,14 +231,16 @@ if ('running' in st.session_state and st.session_state.running) or 'run_id' in s
                         CREATE_EXPORT_DIR(f)
                     config_updates = {
                         "hopdong": os.path.join(tmp_output_dir, file_name),
-                        "ip": file_ip,
-                        "mapping": file_mapping,
+                        "ip": file_uploaded['ip'],
+                        "mapping": file_uploaded['mapping'],
                         "output_dir": conf['OUTPUT_DIR'],
                         "database_name": conf['DB_NAME'],
-                        "template": file_template,
+                        "template": file_uploaded['template'],
                         "ip_sheet": st.session_state['input_data_phase_1.1']['ip_sheet'],
                         "mapping_sheet": st.session_state['input_data_phase_1.1']['mapping_sheet'],
-                        'wipe_atp': st.session_state['input_data_phase_1.1']['wipe_atp']
+                        'wipe_atp': st.session_state['input_data_phase_1.1']['wipe_atp'],
+                        'signning': file_uploaded['signning'] if 'signning' in file_uploaded else None,
+                        'signning_sheet': st.session_state['input_data_phase_1.1']['signning_sheet'] if 'signning_sheet' in st.session_state['input_data_phase_1.1'] else None,
                     }
                 elif st.session_state.running_job == '1.2':
                     ex.observers = [sql_observer]

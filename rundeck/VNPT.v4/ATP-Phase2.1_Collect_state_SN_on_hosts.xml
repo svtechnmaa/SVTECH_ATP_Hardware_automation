@@ -1,0 +1,117 @@
+<joblist>
+  <job>
+    <context>
+      <options preserveOrder='true'>
+        <option name='log_count' required='true' value='2'>
+          <hidden>true</hidden>
+          <label>Number of log file</label>
+        </option>
+        <option name='log_dir' required='true' value='/opt/SVTECH-Junos-Automation/Python-Development/test/ATP_HARDWARE_TOOL1/output/LOG'>
+          <hidden>true</hidden>
+          <label>dir to store log file</label>
+        </option>
+        <option enforcedvalues='true' name='log_level' required='true' value='WARNING' values='CRITICAL,DEBUG,ERROR,INFO,WARNING'>
+          <hidden>true</hidden>
+          <label>log level</label>
+        </option>
+        <option name='log_size' required='true' value='2097152'>
+          <hidden>true</hidden>
+          <label>Size for log file</label>
+        </option>
+        <option name='log_timestamp' required='true' value='%Y-%m-%d'>
+          <hidden>true</hidden>
+          <label>timestamp in strftime format for log file</label>
+        </option>
+        <option enforcedvalues='true' name='shell_output' required='true' value='NO' values='NO,YES'>
+          <description>Log debug on screen while running</description>
+          <label>Log debug</label>
+        </option>
+        <option name='output_dir' required='true' value='/opt/ATP_output_result'>
+          <hidden>true</hidden>
+          <label>Output directory</label>
+        </option>
+        <option name='db' required='true' value='database.sqlite' values='database.sqlite'>
+          <hidden>true</hidden>
+          <label>database name</label>
+        </option>
+        <option name='username' required='true'>
+          <label>Login username</label>
+        </option>
+        <option name='password' required='true' secure='true' valueExposed='true'>
+          <label>Login password</label>
+        </option>
+        <option enforcedvalues='true' name='list_hd' required='true' value='None' valuesUrl='http://localhost:1111/atp/vnpt/hd?path=${option.output_dir.value}/${option.db.value}'>
+          <label>List hop dong</label>
+        </option>
+        <option delimiter=',' enforcedvalues='true' multivalueAllSelected='true' multivalued='true' name='list_bbbg' required='true' valuesUrl='http://localhost:1111/atp/vnpt/bbbg?hd=${option.list_hd.value}&amp;path=${option.output_dir.value}/${option.db.value}'>
+          <label>List BBBG</label>
+        </option>
+      </options>
+    </context>
+    <defaultTab>summary</defaultTab>
+    <description></description>
+    <executionEnabled>true</executionEnabled>
+    <group>ATP-VNPT 5 phase</group>
+    <id>5dcdfa65-5ff1-4378-a94f-3b0fd4959c7f</id>
+    <loglevel>INFO</loglevel>
+    <name>ATP-Phase2.1 Collect state SN on hosts</name>
+    <nodeFilterEditable>false</nodeFilterEditable>
+    <scheduleEnabled>true</scheduleEnabled>
+    <sequence keepgoing='false' strategy='node-first'>
+      <command>
+        <description>run python</description>
+        <script><![CDATA[export output_dir=$(echo @option.output_dir@)
+export db=$(echo @option.db@)
+export log_count=$(echo @option.log_count@)
+export log_size=$(echo @option.log_size@)
+export log_level=$(echo @option.log_level@)
+export log_dir=$(echo @option.log_dir@)
+export log_timestamp=$(echo @option.log_timestamp@)
+export username=$(echo "@option.username@")
+export password=$(echo "@option.password@")
+export list_bbbg=$(echo "@option.list_bbbg@")
+export hopdong=$(echo "@option.list_hd@")
+export shelloutput=$(echo @option.shell_output@)
+
+/opt/.pyenv/shims/python -u /opt/SVTECH-Junos-Automation/Python-Development/atp_hardware_tool/VNPT.v4/phase2_1.py -o "$output_dir" -db "$db" -hd "$hopdong" -b "$list_bbbg" -u "$username" -p "$password" --log_size "$log_size" --log_count "$log_count" --log_timestamp "$log_timestamp" --log_level "$log_level" --log_dir "$log_dir" --shell_output "$shelloutput"
+
+]]></script>
+        <scriptargs />
+      </command>
+      <command>
+        <description>Link view grafana</description>
+        <plugins>
+          <LogFilter type='render-datatype'>
+            <config>
+              <datatype>text/html</datatype>
+              <sanitizeHtml>true</sanitizeHtml>
+              <striped>false</striped>
+            </config>
+          </LogFilter>
+        </plugins>
+        <script><![CDATA[echo "                                                                     "
+echo "*********************************************************************"
+echo "*********************** OUTPUT FILE *********************************"
+echo "*********************************************************************"
+echo "View grafana link to check serial-number result at one of the link bellow:"
+ 
+if ! [ -z "${HOST_IP}" ]; then
+    echo "<a href='http://$HOST_IP/grafana/d/TsRAci-Vz/serial-number-atp-status?orgId=1&var-hopdong=$hd'>Link Grafana to view serial-number ATP status panel </a>"
+    
+else
+    ips=$(ip addr | awk '/^[0-9]+:/ { currentinterface=$2; } /inet / && currentinterface !~ /^(docker0|veth|br|lo)/ { split($2, parts, "/"); print parts[1]; }')
+    hd=$(echo "@option.list_hd@")
+    echo "$hd"
+    readarray -t IPs <<<"$ips"
+    for ip in "${IPs[@]}"; do
+        echo "<a href='http://$ip/grafana/d/TsRAci-Vz/serial-number-atp-status?orgId=1&var-hopdong=$hd' style='color:#0096FF;'>Link Grafana to view serial number ATP status panel with $ip</a>"
+        echo "<a href='http://$ip/grafana/d/gX8JT7a4k/serial-number-planning?orgId=1&var-hopdong=$hd' style='color:#0096FF;'>Link Grafana to view serial number planning view panel with $ip</a>"
+        echo "---------------------------------------------------------------------------------------------------------"
+    done
+fi]]></script>
+        <scriptargs />
+      </command>
+    </sequence>
+    <uuid>5dcdfa65-5ff1-4378-a94f-3b0fd4959c7f</uuid>
+  </job>
+</joblist>

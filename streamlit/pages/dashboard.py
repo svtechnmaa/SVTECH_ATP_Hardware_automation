@@ -1,8 +1,15 @@
 import streamlit as st
 from io import BytesIO
-from utils import *
 import zipfile
+import os
+import sys
 from pathlib import Path
+current_script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root_dir = os.path.abspath(os.path.join(current_script_dir, '..'))
+utils_dir_path = os.path.join(project_root_dir, 'utils')
+if utils_dir_path not in sys.path:
+    sys.path.insert(0, utils_dir_path)
+from streamlit_utils import *
 
 st.header('ATP Summary')
 conf=read_conf()

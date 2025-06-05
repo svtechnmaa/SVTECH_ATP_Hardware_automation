@@ -5,11 +5,9 @@ RUN apt-get update -y \
     && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 ARG git_token
 ENV CONFIG_FILE="/opt/SVTECH_ATP_Hardware_automation/config.yaml"
-RUN /usr/bin/git clone -n --depth=1 --filter=tree:0 --no-checkout --branch Developer https://$git_token@github.com/svtechnmaa/SVTECH-Junos-Automation.git /opt/SVTECH-Junos-Automation
-RUN cd /opt/SVTECH-Junos-Automation && git sparse-checkout set --no-cone Python-Development/atp_hardware_tool/VNPT.v4 && git checkout
-RUN pip install --no-cache-dir -r /opt/SVTECH-Junos-Automation/Python-Development/atp_hardware_tool/VNPT.v4/requirements.txt
 RUN /usr/bin/git clone --branch main https://$git_token@github.com/svtechnmaa/SVTECH_ATP_Hardware_automation.git /opt/SVTECH_ATP_Hardware_automation
 WORKDIR /opt/SVTECH_ATP_Hardware_automation
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r deployment/requirements.txt
+RUN mkdir -p /opt/ATP_output_result
 EXPOSE 8501
 CMD ["streamlit", "run", "/opt/SVTECH_ATP_Hardware_automation/streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]

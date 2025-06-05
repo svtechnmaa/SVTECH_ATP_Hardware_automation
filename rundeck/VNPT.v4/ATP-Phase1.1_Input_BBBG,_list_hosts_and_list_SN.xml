@@ -1,0 +1,269 @@
+<joblist>
+  <job>
+    <context>
+      <options preserveOrder='true'>
+        <option name='log_count' required='true' value='2'>
+          <hidden>true</hidden>
+          <label>Number of log file</label>
+        </option>
+        <option name='log_dir' required='true' value='/opt/SVTECH-Junos-Automation/Python-Development/test/ATP_HARDWARE_TOOL1/output/LOG'>
+          <hidden>true</hidden>
+          <label>dir to store log file</label>
+        </option>
+        <option enforcedvalues='true' name='log_level' required='true' value='WARNING' values='CRITICAL,DEBUG,ERROR,INFO,WARNING'>
+          <hidden>true</hidden>
+          <label>log level</label>
+        </option>
+        <option name='log_size' required='true' value='2097152'>
+          <hidden>true</hidden>
+          <label>Size for log file</label>
+        </option>
+        <option name='log_timestamp' required='true' value='%Y-%m-%d'>
+          <hidden>true</hidden>
+          <label>timestamp in strftime format for log file</label>
+        </option>
+        <option name='hopdong' required='true' type='file'>
+          <description>Upload file hopdong archive (.zip, .rar, .tar.gz)</description>
+          <label>upload file hopdong archive</label>
+        </option>
+        <option name='IP' required='true' type='file'>
+          <description>Upload file xlsx mapping Hostname - IP Loopback</description>
+          <label>upload file IP</label>
+        </option>
+        <option name='mapping' required='true' type='file'>
+          <description>Upload file xlsx mapping Hostname - BBBG</description>
+          <label>upload file mapping</label>
+        </option>
+        <option name='output_dir' required='true' value='/opt/ATP_output_result'>
+          <hidden>true</hidden>
+          <label>output directory</label>
+        </option>
+        <option name='db' required='true' value='database.sqlite'>
+          <hidden>true</hidden>
+          <label>database name</label>
+        </option>
+        <option enforcedvalues='true' name='shell_output' required='true' value='NO' values='NO,YES'>
+          <description>Log debug on screen while running</description>
+          <label>Log debug</label>
+        </option>
+        <option name='template' required='true' type='file'>
+          <label>template file</label>
+        </option>
+        <option enforcedvalues='true' name='wipe' required='true' value='NO' values='NO,YES'>
+          <description>Wipe folder ATP result if name HD already exist</description>
+          <label>Wipe ATP folder</label>
+        </option>
+      </options>
+    </context>
+    <defaultTab>summary</defaultTab>
+    <description></description>
+    <executionEnabled>true</executionEnabled>
+    <group>ATP-VNPT 5 phase</group>
+    <id>2adfc369-38e0-43fd-b10f-2252d5b3144e</id>
+    <loglevel>INFO</loglevel>
+    <name>ATP-Phase1.1 Input BBBG, list hosts and list SN</name>
+    <nodeFilterEditable>false</nodeFilterEditable>
+    <scheduleEnabled>true</scheduleEnabled>
+    <sequence keepgoing='false' strategy='node-first'>
+      <command>
+        <node-step-plugin type='stub-node-step'>
+          <configuration>
+            <entry key='data' value='TEMP_DIR=/var/tmp/atp_vnpt&#10;TEMP_FOLDER=template&#10;TEMP_EXTRACT_FOLDER=extracted' />
+            <entry key='format' value='properties' />
+          </configuration>
+        </node-step-plugin>
+      </command>
+      <command>
+        <description>File Handling</description>
+        <script><![CDATA[export TEMP_DIR=$(echo @stub.TEMP_DIR@)
+
+export FILE_HOPDONG_SRC=$(echo "@file.hopdong@")
+export FILE_HOPDONG_NAME=$(echo "@file.hopdong.fileName@")
+export FILE=$(echo "$TEMP_DIR/$FILE_HOPDONG_NAME")
+export TEMP_EXTRACT_FOLDER=$(echo @stub.TEMP_EXTRACT_FOLDER@)
+export output_dir=$(echo "@option.output_dir@")
+
+#create TEMP_DIR
+if [ ! -d "$TEMP_DIR" ]; 
+then
+    mkdir -p "$TEMP_DIR";
+    echo "Create $TEMP_DIR"
+fi
+
+#create output directory
+if [ ! -d "$output_dir" ]; 
+then
+    mkdir -p "$output_dir";
+    echo "Create $output_dir"
+fi
+#function extract 
+f_extract_rar() {
+    rm -rf  ${TEMP_DIR}/${TEMP_EXTRACT_FOLDER}
+    mkdir -m 0775 -p ${TEMP_DIR}/${TEMP_EXTRACT_FOLDER};
+    unar "${FILE}" -o "${TEMP_DIR}/${TEMP_EXTRACT_FOLDER}" >/dev/null 2>&1
+    chmod -R 775 "${TEMP_DIR}/${TEMP_EXTRACT_FOLDER}"
+    # unar x "${FILE}" -o ${TEMP_DIR}/${TEMP_EXTRACT_FOLDER} >/dev/null 2>&1
+}
+
+f_extract_zip() {
+    rm -rf  "${TEMP_DIR}/${TEMP_EXTRACT_FOLDER}"
+    mkdir -m 0775 -p "${TEMP_DIR}/${TEMP_EXTRACT_FOLDER}";
+  #unzip "${FILE}" -d "${TEMP_DIR}/${TEMP_EXTRACT_FOLDER}" >/dev/null 2>&1
+    unzip -qO UTF-8 "${FILE}" -d "${TEMP_DIR}/${TEMP_EXTRACT_FOLDER}" >/dev/null 2>&1
+    chmod -R 775 "${TEMP_DIR}/${TEMP_EXTRACT_FOLDER}"
+}
+
+f_extract_tar_gz() {
+    rm -rf  ${TEMP_DIR}/${TEMP_EXTRACT_FOLDER}
+    mkdir -m 0775 -p ${TEMP_DIR}/${TEMP_EXTRACT_FOLDER};
+
+  tar zxf "${FILE}" -C ${TEMP_DIR}/${TEMP_EXTRACT_FOLDER} >/dev/null 2>&1
+  chmod -R 775 "${TEMP_DIR}/${TEMP_EXTRACT_FOLDER}"
+
+}
+
+echo -n "[INFO] Uploading file to server: "
+cp -rf "$FILE_HOPDONG_SRC" "$FILE"
+if [ $? == 0 ]; then
+  echo "OK"
+else
+  echo "FAILED"
+  exit 1
+fi
+echo "[INFO] Extracting uploaded file:"
+if [ `ls "$FILE" |grep ".*rar$"|wc -l` -gt 0 ]; then
+  echo -n "- File '${FILE} (.rar) is being extracted: "
+  f_extract_rar
+elif [ `ls "$FILE" |grep ".*zip$" | wc -l` -gt 0 ]; then
+  echo -n "- File '${FILE}' (.zip) is being extracted: "
+  f_extract_zip
+elif [ `ls "$FILE" |grep -e ".*tar.gz$" -e ".*tgz$" | wc -l` -gt 0 ]; then
+  echo -n "- File '${FILE}' (.tar.gz or .tgz) is being extracted: "
+  f_extract_tar_gz
+fi
+if [ $? == 0 ]; then
+  echo "OK"
+else
+  echo "FAILED"
+  exit 1
+fi
+rm "$FILE"
+IFS='.' #setting comma as delimiter  
+read -a strarr <<<"$FILE_HOPDONG_NAME" #reading str as an array as tokens separated by IFS
+export folder_hd=$(echo "${TEMP_DIR}/${TEMP_EXTRACT_FOLDER}/${strarr[0]}")
+export template=$(echo "@file.template@")
+export template_name=$(echo "@file.template.fileName@")
+export template_folder=$(echo "@stub.TEMP_FOLDER@")
+if [ ! -d "$TEMP_DIR/$template_folder" ];
+then
+    mkdir -p "$TEMP_DIR/$template_folder";
+    echo "Create $TEMP_DIR/$template_folder"
+fi
+export FILE_TEMP=$(echo "$TEMP_DIR/$template_folder/$template_name")
+echo "Uploading file template to server:"
+cp -rf "$template" "$FILE_TEMP"
+if [ $? == 0 ]; then
+  echo "OK"
+else
+  echo "FAILED"
+  exit 1
+fi]]></script>
+        <scriptargs />
+      </command>
+      <command>
+        <description>Handle wipe selection</description>
+        <script><![CDATA[export output_dir=$(echo "@option.output_dir@")
+export FILE_HOPDONG_NAME=$(echo "@file.hopdong.fileName@")
+export wipe=$(echo "@option.wipe@")
+IFS='.' #setting comma as delimiter  
+read -a strarr <<<"$FILE_HOPDONG_NAME"
+export folder_hd_output=$(echo "$output_dir/${strarr[0]}")
+
+if [ ! -d "$folder_hd_output" ]; then
+    echo "Create $folder_hd_output"
+    mkdir -p "$folder_hd_output";
+    mkdir -p "$folder_hd_output/ATP";
+    mkdir -p "$folder_hd_output/ATP Template";
+else
+    if [ $wipe = "YES" ]; then
+        echo "Wipe folder ATP"
+        rm -rf "$folder_hd_output/ATP/"*;
+    fi
+fi]]></script>
+        <scriptargs />
+      </command>
+      <command>
+        <description>Run python</description>
+        <script><![CDATA[export TEMP_DIR=$(echo @stub.TEMP_DIR@)
+
+export FILE_HOPDONG_SRC=$(echo "@file.hopdong@")
+export FILE_HOPDONG_NAME=$(echo "@file.hopdong.fileName@")
+export TEMP_EXTRACT_FOLDER=$(echo @stub.TEMP_EXTRACT_FOLDER@)
+
+IFS='.' #setting comma as delimiter  
+read -a strarr <<<"$FILE_HOPDONG_NAME" #reading str as an array as tokens separated by IFS
+export folder_hd=$(echo "${TEMP_DIR}/${TEMP_EXTRACT_FOLDER}/${strarr[0]}")
+export template_name=$(echo "@file.template.fileName@")
+export template_folder=$(echo "@stub.TEMP_FOLDER@")
+
+export FILE_TEMP=$(echo "$TEMP_DIR/$template_folder/$template_name")
+
+export FILE_MAPPING=$(echo @file.mapping@)
+export FILE_IP=$(echo @file.IP@)
+export db=$(echo @option.db@)
+export log_count=$(echo @option.log_count@)
+export log_size=$(echo @option.log_size@)
+export log_level=$(echo @option.log_level@)
+export log_dir=$(echo @option.log_dir@)
+export log_timestamp=$(echo @option.log_timestamp@)
+export output_dir=$(echo @option.output_dir@)
+export shelloutput=$(echo @option.shell_output@)
+
+
+/opt/.pyenv/shims/python -u /opt/SVTECH-Junos-Automation/Python-Development/atp_hardware_tool/VNPT.v4/phase1_1.py -hd "$folder_hd" -m "$FILE_MAPPING" -i "$FILE_IP" -o "$output_dir" -template "$FILE_TEMP" -db "$db" --log_size "$log_size" --log_count "$log_count" --log_timestamp "$log_timestamp" --log_level "$log_level" --log_dir "$log_dir" --shell_output "$shelloutput"
+
+
+]]></script>
+        <scriptargs />
+      </command>
+      <command>
+        <description>Link to download file template and link grafana</description>
+        <plugins>
+          <LogFilter type='render-datatype'>
+            <config>
+              <datatype>text/html</datatype>
+              <sanitizeHtml>true</sanitizeHtml>
+              <striped>false</striped>
+            </config>
+          </LogFilter>
+        </plugins>
+        <script><![CDATA[echo "                                                                     "
+echo "*********************************************************************"
+echo "*********************** OUTPUT FILE *********************************"
+echo "*********************************************************************"
+echo "View Output FILE and grafana link to check serial-number result at one of the link bellow:"
+export FILE_HOPDONG_NAME=$(echo "@file.hopdong.fileName@")
+export output_dir=$(echo "@option.output_dir@")
+IFS='.' #setting comma as delimiter  
+read -a strarr <<<"$FILE_HOPDONG_NAME"
+path_template="$output_dir/${strarr[0]}/ATP Template"
+if ! [ -z "${HOST_IP}" ]; then
+    echo "<a href='http://$HOST_IP/csv/files?directory=$path_template'>Link to download files template</a>"
+    echo "<a href='http://$HOST_IP/grafana/d/TsRAci-Vz/serial-number?var-hopdong=${strarr[0]}'>Link Grafana to view serial-number result</a>"
+    
+else
+    ips=$(ip addr | awk '/^[0-9]+:/ { currentinterface=$2; } /inet / && currentinterface !~ /^(docker0|veth|br|lo)/ { split($2, parts, "/"); print parts[1]; }')
+    readarray -t IPs <<<"$ips"
+    for ip in "${IPs[@]}"; do
+        echo "<a href='http://$ip/csv/files?directory=$path_template' style='color:#0096FF;'>Link to download files template with $ip</a>"
+        echo "<a href='http://$ip/grafana/d/TsRAci-Vz/serial-number-atp-status?orgId=1&var-hopdong=${strarr[0]}' style='color:#0096FF;'>Link Grafana to view serial number ATP status panel with $ip</a>"
+        echo "---------------------------------------------------------------------------------------------------------"
+    done
+fi
+]]></script>
+        <scriptargs />
+      </command>
+    </sequence>
+    <uuid>2adfc369-38e0-43fd-b10f-2252d5b3144e</uuid>
+  </job>
+</joblist>

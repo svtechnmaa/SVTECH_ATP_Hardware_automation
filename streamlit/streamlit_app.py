@@ -1,6 +1,13 @@
 import streamlit as st
-from utils import *
+import sys
+import os
 from functools import partial
+current_script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root_dir = os.path.abspath(os.path.join(current_script_dir, '..'))
+utils_dir_path = os.path.join(project_root_dir, 'utils')
+if utils_dir_path not in sys.path:
+    sys.path.insert(0, utils_dir_path)
+from streamlit_utils import *
 
 conf=read_conf()
 all_phase=conf['input_vars']

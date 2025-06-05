@@ -1,0 +1,85 @@
+<joblist>
+  <job>
+    <context>
+      <options preserveOrder='true'>
+        <option name='output_dir' required='true' value='/opt/ATP_output_result'>
+          <hidden>true</hidden>
+          <label>Output directory</label>
+        </option>
+        <option name='db' required='true' value='database.sqlite'>
+          <hidden>true</hidden>
+          <label>database name</label>
+        </option>
+        <option name='planning' required='true' type='file'>
+          <description>Upload file xlsx planning for Hostname - SN - Slot</description>
+          <label>Upload Planning SN</label>
+        </option>
+        <option enforcedvalues='true' name='list_hd' required='true' value='None' valuesUrl='http://localhost:1111/atp/vnpt/hd?path=${option.output_dir.value}/${option.db.value}'>
+          <description>Hop dong for planning file uploaded</description>
+          <label>Hop dong</label>
+        </option>
+      </options>
+    </context>
+    <defaultTab>summary</defaultTab>
+    <description></description>
+    <executionEnabled>true</executionEnabled>
+    <group>ATP-VNPT 5 phase</group>
+    <id>bdd878b1-e652-4564-aeab-788b3cc129a2</id>
+    <loglevel>INFO</loglevel>
+    <name>ATP-Phase1.2 Input planning slot (OPTIONAL)</name>
+    <nodeFilterEditable>false</nodeFilterEditable>
+    <scheduleEnabled>true</scheduleEnabled>
+    <sequence keepgoing='false' strategy='node-first'>
+      <command>
+        <description>run python</description>
+        <script><![CDATA[export FILE_PLANNING=$(echo @file.planning@)
+export output_dir=$(echo @option.output_dir@)
+export db=$(echo @option.db@)
+export hd=$(echo @option.list_hd@)
+#export log_count=$(echo @option.log_count@)
+#export log_size=$(echo @option.log_size@)
+#export log_level=$(echo @option.log_level@)
+#export log_dir=$(echo @option.log_dir@)
+#export log_timestamp=$(echo @option.log_timestamp@)
+
+/opt/.pyenv/shims/python -u /opt/SVTECH-Junos-Automation/Python-Development/atp_hardware_tool/VNPT.v4/phase1_2.py -p "$FILE_PLANNING" -o "$output_dir" -db "$db" -hd "$hd"
+
+]]></script>
+        <scriptargs />
+      </command>
+      <command>
+        <description>Link view grafana</description>
+        <plugins>
+          <LogFilter type='render-datatype'>
+            <config>
+              <datatype>text/html</datatype>
+              <sanitizeHtml>true</sanitizeHtml>
+              <striped>false</striped>
+            </config>
+          </LogFilter>
+        </plugins>
+        <script><![CDATA[echo "                                                                     "
+echo "*********************************************************************"
+echo "*********************** OUTPUT FILE *********************************"
+echo "*********************************************************************"
+echo "View grafana link to check serial-number result at one of the link bellow:"
+
+ 
+if ! [ -z "${HOST_IP}" ]; then
+    echo "<a href='http://$HOST_IP/grafana/d/TsRAci-Vz/serial-number>Link Grafana to view serial-number result</a>"
+    
+else
+    ips=$(ip addr | awk '/^[0-9]+:/ { currentinterface=$2; } /inet / && currentinterface !~ /^(docker0|veth|br|lo)/ { split($2, parts, "/"); print parts[1]; }')
+    readarray -t IPs <<<"$ips"
+    for ip in "${IPs[@]}"; do
+        echo "<a href='http://$ip/grafana/d/gX8JT7a4k/serial-number-planning?orgId=1'>Link Grafana to view serial number planning view panel with $ip</a>"
+        echo "---------------------------------------------------------------------------------------------------------"
+    done
+fi
+]]></script>
+        <scriptargs />
+      </command>
+    </sequence>
+    <uuid>bdd878b1-e652-4564-aeab-788b3cc129a2</uuid>
+  </job>
+</joblist>

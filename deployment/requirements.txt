@@ -1,8 +1,10 @@
 junos_eznc==2.6.7
+numpy==1.25.2
 openpyxl==3.1.2
-pandas==2.2.3
+pandas==2.3.0
+python_docx==1.1.2
 PyYAML==6.0.2
 rarfile==4.1
 sacred==0.8.7
-streamlit==1.45.1
+yamllint==1.33.0
 SQLAlchemy==2.0.40

@@ -1,0 +1,73 @@
+---
+FPCTable:
+    rpc: get-chassis-inventory
+    item: //name[starts-with(.,'FPC')]/parent::* #Do not change this, this syntax is used to cover multi-routing engine use case
+    view: _FPC_view
+_FPC_view:
+    fields:
+        hardware_name: name
+        sn: serial-number
+
+PICTable:
+    rpc: get-chassis-inventory
+    item: //name[starts-with(.,'PIC')]/parent::*
+    key:
+        - ancestor::*[starts-with(name,'FPC')]/name
+    view: _PIC_view
+_PIC_view:
+    fields:
+        hardware_name: name
+        sn: serial-number
+
+ModuleTable:
+    rpc: get-chassis-inventory
+    item: //name[starts-with(.,'Xcvr')]/parent::*
+    key:
+        - ancestor::*[starts-with(name,'FPC')]/name
+        - ancestor::*[starts-with(name,'PIC')]/name
+    view: _Module_view
+_Module_view:
+    fields:
+        hardware_name: name
+        sn: serial-number
+        pic_slot: ../name
+        fpc_slot: ancestor::*[starts-with(name,'FPC')]/name
+
+LCATable:
+    rpc: get-chassis-inventory
+    item: //name[starts-with(.,'ADC')]/parent::*
+    view: _LCA_view
+_LCA_view:
+    fields:
+        hardware_name: name
+        sn: serial-number
+
+ChassisTable:
+  item: //name[starts-with(.,'Chassis')]/parent::*
+  rpc: get-chassis-inventory
+  view: _Chassis_view
+
+_Chassis_view:
+  fields:
+    sn: serial-number
+
+RETable:
+  rpc: get-route-engine-information
+  item: //route-engine
+  key: slot
+  view: _RE_view
+_RE_view:
+  fields:
+    Slot: slot
+    State: mastership-state
+
+CBTable:
+  rpc: get-environment-cb-information
+  args:
+    slot: '2'
+  item: //environment-component-item
+  key: name
+  view: _CB_view
+_CB_view:
+  fields:
+    state: state

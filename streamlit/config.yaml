@@ -8,6 +8,7 @@ input_vars:
         - rar
         - tar.gz
       label: Upload file hopdong
+      require: True
     ip:
       widget: file_uploader
       placeholder: Upload file xlsx mapping Hostname - IP Loopback
@@ -15,8 +16,10 @@ input_vars:
         - xlsx
         - csv
       label: Upload file IP
+      require: True
     ip_sheet:
       widget: empty
+      require: False
     mapping:
       widget: file_uploader
       placeholder: Upload file xlsx mapping Hostname - BBBG
@@ -24,8 +27,21 @@ input_vars:
         - xlsx
         - csv
       label: Upload file mapping
+      require: True
     mapping_sheet:
       widget: empty
+      require: False
+    signning:
+      widget: file_uploader
+      placeholder: Upload file signning and time atp info
+      accept_value:
+        - xlsx
+        - csv
+      label: Upload file signning
+      require: False
+    signning_sheet:
+      widget: empty
+      require: False
     template:
       widget: file_uploader
       placeholder: Upload file ATP template
@@ -33,16 +49,19 @@ input_vars:
         - doc
         - docx
       label: Upload file template
+      require: True
     wipe_atp:
       widget: checkbox
       default: No
       placeholder: Wipe folder ATP result if name HD already exist
       label: Wipe ATP folder
+      require: True
   '1.2':
     hopdong:
       widget: selectbox
       accept_value: []
       label: List hop dong
+      require: True
     planningSN:
       widget: file_uploader
       placeholder: Upload file xlsx planning for Hostname - SN - Slot
@@ -50,66 +69,80 @@ input_vars:
         - xlsx
         - csv
       label: Upload file planning SN
+      require: True
     planningSN_sheet:
       widget: empty
+      require: False
   '2.1':
     hopdong:
       widget: selectbox
       accept_value: []
       label: List hop dong
+      require: True
     list_bbbg:
       widget: multiselect
       accept_value: []
       label: List BBBG
       default: []
+      require: True
     username:
       widget: text_input
       label: Login username
       default: ''
       type: default
+      require: True
     password:
       widget: text_input
       label: Login password
       default: ''
       type: password
+      require: True
   '2.2':
     hopdong:
       widget: selectbox
       accept_value: []
       label: List hop dong
+      require: True
     hostname:
       widget: selectbox
       accept_value: []
       label: List Hosts
+      require: True
     hostslot:
       widget: multiselect
       accept_value: []
       label: List SN
       default: []
+      require: True
     username:
       widget: text_input
       label: Login username
       default: ''
       type: default
+      require: True
     password:
       widget: text_input
       label: Login password
       default: ''
       type: password
+      require: True
     request_reboot:
       widget: checkbox
       default: No
       label: Reboot card
+      require: True
   '2.3':
     hopdong:
       widget: selectbox
       accept_value: []
       label: List hop dong
+      require: True
     list_bbbg:
       widget: multiselect
       accept_value: []
       label: List BBBG
       default: []
+      require: True
 OUTPUT_DIR: /opt/ATP_output_result
 DB_NAME: database.sqlite
 TEMP_EXTRACT_HD: /var/tmp/atp_vnpt
