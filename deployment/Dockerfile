@@ -4,7 +4,7 @@ RUN apt-get update -y \
     && apt-get clean all \
     && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 ARG git_token
-ENV CONFIG_FILE="/opt/SVTECH_ATP_Hardware_automation/config.yaml"
+ENV CONFIG_FILE="/opt/SVTECH_ATP_Hardware_automation/streamlit/config.yaml"
 RUN /usr/bin/git clone --branch main https://$git_token@github.com/svtechnmaa/SVTECH_ATP_Hardware_automation.git /opt/SVTECH_ATP_Hardware_automation
 WORKDIR /opt/SVTECH_ATP_Hardware_automation
 RUN pip install --no-cache-dir -r deployment/requirements.txt

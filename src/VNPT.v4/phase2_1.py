@@ -12,13 +12,11 @@ import ast
 import sys
 from datetime import datetime
 import numpy as np
-
-#tu.doan: set the WORKING DIRECTORY to the directory that contain this script, so that relative path to module_utils and tableview file always work, regardless of whether we call python from rundeck or virtualenv or anywhere else
-abspath = os.path.abspath(__file__)
-dname = os.path.dirname(abspath)
-os.chdir(dname)
-# sys.path.append('../../../')
-# sys.path.append('../../../module_utils')
+current_script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root_dir = os.path.abspath(os.path.join(current_script_dir, '..', '..'))
+utils_dir_path = os.path.join(project_root_dir, 'utils')
+if utils_dir_path not in sys.path:
+    sys.path.insert(0, utils_dir_path)
 from module_utils import *
 
 def NetConf(host, username, password):
@@ -35,7 +33,7 @@ def CheckSn(netConf, hostname):
     print("checkSN")
     list_data_type=['FPC','PIC','Module','LCA', 'Chassis']
     for data_type in list_data_type:
-            tempData = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netConf,tableview_file='../hardwareTable.yml',data_type=data_type,output_format='dataframe')
+            tempData = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netConf,tableview_file=os.path.join(current_script_dir, '../hardwareTable.yml'),data_type=data_type,output_format='dataframe')
             if isinstance(tempData, pd.DataFrame) and not tempData.empty:
                 tempData['type']=data_type
                 if data_type=='LCA':

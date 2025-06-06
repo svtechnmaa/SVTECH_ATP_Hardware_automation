@@ -14,14 +14,11 @@ import copy
 import docx
 import pathlib
 from docx.table import _Cell
-
-
-#tu.doan: set the WORKING DIRECTORY to the directory that contain this script, so that relative path to module_utils and tableview file always work, regardless of whether we call python from rundeck or virtualenv or anywhere else
-abspath = os.path.abspath(__file__)
-dname = os.path.dirname(abspath)
-os.chdir(dname)
-# sys.path.append('../../../')
-# sys.path.append('../../../module_utils')
+current_script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root_dir = os.path.abspath(os.path.join(current_script_dir, '..', '..'))
+utils_dir_path = os.path.join(project_root_dir, 'utils')
+if utils_dir_path not in sys.path:
+    sys.path.insert(0, utils_dir_path)
 from module_utils import *
 
 def delete_paragraph(paragraph):

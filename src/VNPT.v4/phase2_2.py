@@ -2,25 +2,19 @@ import os
 import re
 import pandas as pd
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from docx.shared import Pt
 import logging
 from jnpr.junos import Device, exception
-import sys
 import sqlite3
 import argparse
-from glob import glob
-import copy
-import docx
-import pathlib
-
-#tu.doan: set the WORKING DIRECTORY to the directory that contain this script, so that relative path to module_utils and tableview file always work, regardless of whether we call python from rundeck or virtualenv or anywhere else
-abspath = os.path.abspath(__file__)
-dname = os.path.dirname(abspath)
-os.chdir(dname)
-
-# sys.path.append('../../../')
-# sys.path.append('../../../module_utils')
+import random
+import sys
+current_script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root_dir = os.path.abspath(os.path.join(current_script_dir, '..', '..'))
+utils_dir_path = os.path.join(project_root_dir, 'utils')
+if utils_dir_path not in sys.path:
+    sys.path.insert(0, utils_dir_path)
 from module_utils import *
 
 def NetConf(host, username, password):
@@ -39,16 +33,16 @@ def CheckSn(netConf,hw_type):
     print("checkSN")
     device_hardware =pd.DataFrame()
     if hw_type=='fpc':
-        device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netConf,tableview_file='../hardwareTable.yml',data_type='FPC', include_hostname=False,output_format='dataframe')
+        device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netConf,tableview_file=os.path.join(current_script_dir, '../hardwareTable.yml'),data_type='FPC', include_hostname=False,output_format='dataframe')
         device_hardware["slot"]=device_hardware['hardware_name'].apply(lambda x: str(re.search("FPC (\d+)",x).group(1)))
     elif hw_type=='module':
-        device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netConf,tableview_file='../hardwareTable.yml',data_type='Module', include_hostname=False,output_format='dataframe')
+        device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netConf,tableview_file=os.path.join(current_script_dir, '../hardwareTable.yml'),data_type='Module', include_hostname=False,output_format='dataframe')
         device_hardware["slot"] = device_hardware.apply(lambda x: str(x['fpc_slot'].replace(r'FPC ', ''))+'/'+str(x['pic_slot'].replace(r'PIC ', ''))+'/'+str(x['hardware_name'].replace(r'Xcvr ', '')), axis=1)
     elif hw_type=='lca':
-        device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netConf,tableview_file='../hardwareTable.yml',data_type='LCA', include_hostname=False,output_format='dataframe')
+        device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netConf,tableview_file=os.path.join(current_script_dir, '../hardwareTable.yml'),data_type='LCA', include_hostname=False,output_format='dataframe')
         device_hardware["slot"]=device_hardware['hardware_name'].apply(lambda x: str(re.search("ADC (\d+)",x).group(1)))
     elif hw_type=='chassis':
-        device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netConf,tableview_file='../hardwareTable.yml',data_type='Chassis', include_hostname=False,output_format='dataframe')
+        device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netConf,tableview_file=os.path.join(current_script_dir, '../hardwareTable.yml'),data_type='Chassis', include_hostname=False,output_format='dataframe')
     device_hardware=device_hardware.drop(columns=['tableview_key',])
     return device_hardware
 
@@ -147,6 +141,83 @@ def update_db(conn_db, hostname, SN, status, hd):
     print("Record Updated successfully")
     cursor.close()
 
+def replace_starttime(multi_line_text, sub_pattern, replacement):
+    """
+    Processes a multi-line text, replacing the date and setting the hour to 00
+    (while retaining minutes and seconds) for every line that matches the pattern.
+
+    Args:
+        multi_line_text (str): The input text containing multiple lines.
+                               Lines like: "Start time  2024-02-02 08:05:18 ICT" will be processed.
+        new_date_str (str): The new date in 'YYYY-MM-DD' format.
+                            Example: "2025-06-05"
+
+    Returns:
+        str: The modified multi-line text. Lines not matching the pattern are unchanged.
+    """
+    extract_pattern_modified = r".*?(\d{4}-\d{2}-\d{2}\s+00:\d{2}:\d{2})\s+.*"
+    lines = multi_line_text.splitlines()
+    modified_lines = []
+    extracted_modified_datetimes = ''
+    for line in lines:
+        modified_line = re.sub(sub_pattern, replacement, line)
+        modified_lines.append(modified_line)
+        if modified_line != line:
+            match = re.search(extract_pattern_modified, modified_line)
+            if match:
+                modified_datetime_string = match.group(1)
+                extracted_modified_datetimes = datetime.strptime(modified_datetime_string, "%Y-%m-%d %H:%M:%S")
+    return "\n".join(modified_lines)+'\n', extracted_modified_datetimes
+
+def replace_uptime(multi_line_text, end_datetime, start_datetime):
+    """
+    Replaces the duration part in 'Uptime' lines within a multi-line text
+    with the calculated difference between two datetime objects.
+
+    Args:
+        multi_line_text (str): The input multi-line string.
+        end_datetime (datetime): The ending datetime.
+        start_datetime (datetime): The starting datetime.
+
+    Returns:
+        str: The modified multi-line text.
+    """
+    total_diff_seconds = int((end_datetime - start_datetime).total_seconds())
+    if total_diff_seconds < 0:
+        total_diff_seconds = 0
+    years = total_diff_seconds // (365 * 24 * 3600)
+    remaining_seconds = total_diff_seconds % (365 * 24 * 3600)
+    months = remaining_seconds // (30 * 24 * 3600)
+    remaining_seconds %= (30 * 24 * 3600)
+    days = remaining_seconds // (24 * 3600)
+    remaining_seconds %= (24 * 3600)
+    hours = remaining_seconds // 3600
+    remaining_seconds %= 3600
+    minutes = remaining_seconds // 60
+    seconds = remaining_seconds % 60
+    duration_parts = []
+    if years > 0:
+        duration_parts.append(f"{years} year{'s' if years != 1 else ''}")
+    if months > 0:
+        duration_parts.append(f"{months} month{'s' if months != 1 else ''}")
+    if days > 0:
+        duration_parts.append(f"{days} day{'s' if days != 1 else ''}")
+    if hours > 0:
+        duration_parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+    if minutes > 0:
+        duration_parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+    if seconds > 0 or not duration_parts:
+        duration_parts.append(f"{seconds} second{'s' if seconds != 1 else ''}")
+    formatted_duration = ", ".join(duration_parts)
+    pattern = r"^(Uptime\s+).*$"
+    replacement = rf"\g<1>{formatted_duration}"
+    modified_lines = []
+    lines = multi_line_text.splitlines()
+    for line in lines:
+        modified_line = re.sub(pattern, replacement, line)
+        modified_lines.append(modified_line)
+    return "\n".join(modified_lines)+'\n'
+
 def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, slot, hd, request_reboot,hostNamDev,log_dir):
     ###Get list SN on device###
     t=1
@@ -173,7 +244,8 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 print('Error check SN of {}, {}'.format(IpHost,err))
                 logging.exception('Error check SN of {}, {}'.format(IpHost,err))
     planning_hardware=pd.read_sql_query("SELECT * FROM 'checkSN' where ma_HD=(?) and Hostname=(?) and Type='fpc' and RealSlot=(?) and (TestStatus='Installed' or TestStatus like 'Checked%')" , conn_db, params=(hd, hostname,slot))
-    planning_time=pd.read_sql_query("""SELECT "Ngày kết thúc", "Thời gian ký" FROM BBBG WHERE ma_HD = ? AND Hostname = ?""", conn_db, params=(hd, hostname))
+    planning_time=pd.read_sql_query("""SELECT "Ngày kết thúc", "Thời gian ký" FROM BBBG WHERE ma_HD = ? AND Hostname = ?""", conn_db, params=(hd, hostname)).iloc[0]
+    planning_time[["Ngày kết thúc", "Thời gian ký"]] = planning_time[["Ngày kết thúc", "Thời gian ký"]].apply(pd.to_datetime, errors='coerce')
     result_installed=compare_db_and_pyez(planning_hardware, device_hardware, slot)
     if result_installed.empty:
         logging.exception("Serial Number and Slot not matching with device")
@@ -282,6 +354,18 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 list_command = ["show chassis hardware","show chassis fpc","show chassis fpc "+fpc_slot+" detail","show chassis fpc pic-status "+fpc_slot,
                             "show chassis pic fpc-slot "+fpc_slot+" pic-slot 0", "show chassis pic fpc-slot "+fpc_slot+" pic-slot 1"]
             for command in list_command:
+                if not pd.isna(planning_time['Ngày kết thúc']) and not pd.isna(planning_time['Thời gian ký']):
+                    if command==f"show chassis fpc {fpc_slot} detail":
+                        output=apply_command(netConf, command, "1.2",hostNamDev)
+                        output_replace, new_starttime = replace_starttime(output, r"^(.*?)(\s+)\d{4}-\d{2}-\d{2}\s+\d{2}:(\d{2}):(\d{2})(\s+.*)$", rf"\g<1>\g<2>{planning_time['Ngày kết thúc'].strftime('%Y-%m-%d')} 00:\g<3>:\g<4>\g<5>")
+                        output_replace=replace_uptime(output_replace, planning_time['Thời gian ký'], new_starttime)
+                        result_show+=output_replace
+                        continue
+                    elif re.search(r'show chassis pic fpc-slot {} pic-slot [01]'.format(fpc_slot), command):
+                        output=apply_command(netConf, command, "1.2",hostNamDev)
+                        output_replace=replace_uptime(output, planning_time['Thời gian ký'], new_starttime + timedelta(minutes=random.randint(5, 10)))
+                        result_show+=output_replace
+                        continue
                 result_show+=apply_command(netConf, command, "1.2",hostNamDev)
             result_show+=apply_command(netConf,"show interface terse media et-{}*".format(fpc_slot),"1.2",hostNamDev)
             if '389' not in hd and '510-2024' not in hd:
@@ -290,13 +374,11 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 list_interface=get_module_in_fpc(netConf,fpc_slot)
                 for i in list_interface:
                     result_show+=apply_command(netConf,f"show interfaces diagnostics optics et-{i}","1.2",hostNamDev)
-
             print("Step 1.2: Done: ... Complete")
             netConf.close()
             if result_show!='':
                 result_write_file+=result_show
                 break
-
         except exception.ConnectError as err:
             t+=1
             print(err)
@@ -498,6 +580,12 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 result_show=""
                 netConf = NetConf(IpHost, UserName, PassWord)
                 for command in ["show chassis fpc "+fpc_slot+" detail", "show chassis fpc pic-status "+fpc_slot, "show interface terse media et-"+fpc_slot+"*"]:
+                    if not pd.isna(planning_time['Ngày kết thúc']) and not pd.isna(planning_time['Thời gian ký']):
+                        if command==f"show chassis fpc {fpc_slot} detail":
+                            output=apply_command(netConf, command, "1.3",hostNamDev)
+                            output_replace, new_starttime = replace_starttime(output, r"^(.*?)(\s+)\d{4}-\d{2}-\d{2}\s+\d{2}:(\d{2}):(\d{2})(\s+.*)$", rf"\g<1>\g<2>{planning_time['Thời gian ký'].strftime('%Y-%m-%d %H:%M:%S')}\g<5>")
+                            result_show+=output_replace
+                            continue
                     result_show+=apply_command(netConf,command,"1.3",hostNamDev)
                 if '389' not in hd and '510' not in hd:
                     command = "show interface terse media xe-"+fpc_slot+"*"
@@ -554,7 +642,8 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             time.sleep(3)
 
     print("Step 1.3: Writing raw log file")
-    with open(os.path.join(log_dir,pre_file_name+"FPC "+fpc_slot+".txt"),"w") as outfile:
+    # with open(os.path.join(log_dir,pre_file_name+"FPC "+fpc_slot+".txt"),"w") as outfile:
+    with open(os.path.join(log_dir,pre_file_name+"FPC "+fpc_sn+".txt"),"w") as outfile:
         outfile.write(result_write_file)
     print("Done writing raw log")
     print("Update db")
@@ -622,7 +711,8 @@ def FirstStepModule(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db
             if result_write_file!="":
                 print("Step 1.2: Done: ... Complete")
                 print("Step 1.2: Writing file log 1_2.txt: ... writing")
-                with open(os.path.join(log_dir,pre_file_name+"Module "+module_slot.replace("/", ".")+".txt"),"w") as outfile:
+                # with open(os.path.join(log_dir,pre_file_name+"Module "+module_slot.replace("/", ".")+".txt"),"w") as outfile:
+                with open(os.path.join(log_dir,pre_file_name+"Module "+module_sn+".txt"),"w") as outfile:
                     outfile.write(result_write_file)
                 print("Step 1.2:Writing log 1_2.txt: ... complete")
                 new_status="Checked"
@@ -691,7 +781,8 @@ def FirstStepLCA(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             if result_write_file!="":
                 print("Step 1.2: Done: ... Complete")
                 print("Step 1.2: Writing file log 1_2.txt: ... writing")
-                with open(os.path.join(log_dir,pre_file_name+"LCA "+slot+".txt"),"w") as outfile:
+                # with open(os.path.join(log_dir,pre_file_name+"LCA "+slot+".txt"),"w") as outfile:
+                with open(os.path.join(log_dir,pre_file_name+"LCA "+lca_sn+".txt"),"w") as outfile:
                     outfile.write(result_write_file)
                 print("Step 1.2:Writing log 1_2.txt: ... complete")
                 new_status="Checked"
