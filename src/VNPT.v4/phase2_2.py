@@ -219,6 +219,28 @@ def replace_uptime(multi_line_text, end_datetime, start_datetime):
     return "\n".join(modified_lines)+'\n'
 
 def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, slot, hd, request_reboot,hostNamDev,log_dir):
+    list_commands_on_hd={
+        '510-2024':{
+            'before_reboot': ['show chassis hardware models', 'show chassis hardware', 'show chassis fpc', "show chassis fpc {fpc_slot} detail", "show chassis fpc pic-status {fpc_slot}",
+                               "show chassis pic fpc-slot {fpc_slot} pic-slot 0", "show chassis pic fpc-slot {fpc_slot} pic-slot 1", "show interface terse media et-{fpc_slot}*", "show interfaces diagnostics optics et-{interface}"],
+            'after_reboot': ["show chassis fpc {fpc_slot} detail", "show chassis fpc pic-status {fpc_slot}", "show interface terse media et-{fpc_slot}*"]
+        },
+        '389':{
+            'before_reboot': ["show chassis hardware",'show chassis hardware models',"show chassis fpc","show chassis fpc {fpc_slot} detail","show chassis fpc pic-status {fpc_slot}",
+                            "show chassis pic fpc-slot {fpc_slot} pic-slot 0", "show chassis pic fpc-slot {fpc_slot} pic-slot 1", "show interface terse media et-{fpc_slot}*"],
+            'after_reboot': ["show chassis fpc {fpc_slot} detail", "show chassis fpc pic-status {fpc_slot}", "show interface terse media et-{fpc_slot}*"]
+        },
+        '126-2025':{
+            'before_reboot': ["show chassis hardware","show chassis fpc","show chassis fpc {fpc_slot} detail","show chassis fpc pic-status {fpc_slot}",
+                            "show chassis pic fpc-slot {fpc_slot} pic-slot 0", "show chassis pic fpc-slot {fpc_slot} pic-slot 1", "show interface terse media et-{fpc_slot}*", "show interface terse media xe-{fpc_slot}*", "show interfaces diagnostics optics et-{interface}", "show interfaces diagnostics optics xe-{interface}"],
+            'after_reboot': ["show chassis fpc {fpc_slot} detail", "show chassis fpc pic-status {fpc_slot}", "show interface terse media et-{fpc_slot}*", "show interface terse media et-{fpc_slot}*", "show interface terse media xe-{fpc_slot}*"]
+        },
+        'default':{
+            'before_reboot': ["show chassis hardware","show chassis fpc","show chassis fpc {fpc_slot} detail","show chassis fpc pic-status {fpc_slot}",
+                            "show chassis pic fpc-slot {fpc_slot} pic-slot 0", "show chassis pic fpc-slot {fpc_slot} pic-slot 1", "show interface terse media et-{fpc_slot}*", "show interface terse media xe-{fpc_slot}*"],
+            'after_reboot': ["show chassis fpc {fpc_slot} detail", "show chassis fpc pic-status {fpc_slot}", "show interface terse media et-{fpc_slot}*", "show interface terse media et-{fpc_slot}*", "show interface terse media xe-{fpc_slot}*"]
+        }
+    }
     ###Get list SN on device###
     t=1
     while t<=6:
@@ -344,36 +366,27 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             netConf = NetConf(IpHost, UserName, PassWord)
             result_show=""
             print("Step 1.2: raw log: ... Waiting")
-            if '389' in hd:
-                list_command = ["show chassis hardware",'show chassis hardware models',"show chassis fpc","show chassis fpc "+fpc_slot+" detail","show chassis fpc pic-status "+fpc_slot,
-                            "show chassis pic fpc-slot "+fpc_slot+" pic-slot 0", "show chassis pic fpc-slot "+fpc_slot+" pic-slot 1"]
-            elif '510-2024' in hd:
-                list_command =['show chassis hardware models', 'show chassis hardware', 'show chassis fpc', "show chassis fpc "+fpc_slot+" detail", "show chassis fpc pic-status "+fpc_slot,
-                               "show chassis pic fpc-slot "+fpc_slot+" pic-slot 0", "show chassis pic fpc-slot "+fpc_slot+" pic-slot 1"]
-            else:
-                list_command = ["show chassis hardware","show chassis fpc","show chassis fpc "+fpc_slot+" detail","show chassis fpc pic-status "+fpc_slot,
-                            "show chassis pic fpc-slot "+fpc_slot+" pic-slot 0", "show chassis pic fpc-slot "+fpc_slot+" pic-slot 1"]
-            for command in list_command:
-                if not pd.isna(planning_time['Ngày kết thúc']) and not pd.isna(planning_time['Thời gian ký']):
-                    if command==f"show chassis fpc {fpc_slot} detail":
-                        output=apply_command(netConf, command, "1.2",hostNamDev)
-                        output_replace, new_starttime = replace_starttime(output, r"^(.*?)(\s+)\d{4}-\d{2}-\d{2}\s+\d{2}:(\d{2}):(\d{2})(\s+.*)$", rf"\g<1>\g<2>{planning_time['Ngày kết thúc'].strftime('%Y-%m-%d')} 00:\g<3>:\g<4>\g<5>")
-                        output_replace=replace_uptime(output_replace, planning_time['Thời gian ký'], new_starttime)
-                        result_show+=output_replace
-                        continue
-                    elif re.search(r'show chassis pic fpc-slot {} pic-slot [01]'.format(fpc_slot), command):
-                        output=apply_command(netConf, command, "1.2",hostNamDev)
-                        output_replace=replace_uptime(output, planning_time['Thời gian ký'], new_starttime + timedelta(minutes=random.randint(5, 10)))
-                        result_show+=output_replace
-                        continue
-                result_show+=apply_command(netConf, command, "1.2",hostNamDev)
-            result_show+=apply_command(netConf,"show interface terse media et-{}*".format(fpc_slot),"1.2",hostNamDev)
-            if '389' not in hd and '510-2024' not in hd:
-                result_show+=apply_command(netConf,"show interface terse media xe-{}*".format(fpc_slot),"1.2",hostNamDev)
-            if '510-2024' in hd:
-                list_interface=get_module_in_fpc(netConf,fpc_slot)
-                for i in list_interface:
-                    result_show+=apply_command(netConf,f"show interfaces diagnostics optics et-{i}","1.2",hostNamDev)
+            list_command = [v['before_reboot'] for k, v in list_commands_on_hd.items() if k in hd] or list_commands_on_hd['default']['before_reboot']
+            edited_starttime=None
+            for command in list_command[0]:
+                if '{fpc_slot}' in command:
+                    command=command.format(fpc_slot=fpc_slot)
+                if command==f"show chassis fpc {fpc_slot} detail" and not pd.isna(planning_time['Ngày kết thúc']) and not pd.isna(planning_time['Thời gian ký']):
+                    output=apply_command(netConf, command, "1.2",hostNamDev)
+                    output_replace, edited_starttime = replace_starttime(output, r"^(.*?)(\s+)\d{4}-\d{2}-\d{2}\s+\d{2}:(\d{2}):(\d{2})(\s+.*)$", rf"\g<1>\g<2>{planning_time['Ngày kết thúc'].strftime('%Y-%m-%d')} 00:\g<3>:\g<4>\g<5>")
+                    output_replace=replace_uptime(output_replace, planning_time['Thời gian ký'], edited_starttime)
+                    result_show+=output_replace
+                elif re.search(r'show chassis pic fpc-slot {} pic-slot [01]'.format(fpc_slot), command) and not pd.isna(planning_time['Ngày kết thúc']) and not pd.isna(planning_time['Thời gian ký']):
+                    output=apply_command(netConf, command, "1.2",hostNamDev)
+                    output_replace=replace_uptime(output, planning_time['Thời gian ký'], edited_starttime + timedelta(minutes=random.randint(5, 10)))
+                    result_show+=output_replace
+                elif 'diagnostics' in command:
+                    list_interface=get_module_in_fpc(netConf,fpc_slot)
+                    for i in list_interface:
+                        result_show+=apply_command(netConf,command.format(interface=i),"1.2",hostNamDev)
+                else:
+                    result_show+=apply_command(netConf, command, "1.2",hostNamDev)
+
             print("Step 1.2: Done: ... Complete")
             netConf.close()
             if result_show!='':
@@ -391,6 +404,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             print(err)
             logging.exception(err)
             time.sleep(3)
+
     if request_reboot=="NO":
         new_status="Checked without reboot"
         result_write_file+=hostNamDev+"User select no reboot\n"
@@ -579,17 +593,16 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 print("CHECK 11: get command output to ATP")
                 result_show=""
                 netConf = NetConf(IpHost, UserName, PassWord)
-                for command in ["show chassis fpc "+fpc_slot+" detail", "show chassis fpc pic-status "+fpc_slot, "show interface terse media et-"+fpc_slot+"*"]:
-                    if not pd.isna(planning_time['Ngày kết thúc']) and not pd.isna(planning_time['Thời gian ký']):
-                        if command==f"show chassis fpc {fpc_slot} detail":
-                            output=apply_command(netConf, command, "1.3",hostNamDev)
-                            output_replace, new_starttime = replace_starttime(output, r"^(.*?)(\s+)\d{4}-\d{2}-\d{2}\s+\d{2}:(\d{2}):(\d{2})(\s+.*)$", rf"\g<1>\g<2>{planning_time['Thời gian ký'].strftime('%Y-%m-%d %H:%M:%S')}\g<5>")
-                            result_show+=output_replace
-                            continue
-                    result_show+=apply_command(netConf,command,"1.3",hostNamDev)
-                if '389' not in hd and '510' not in hd:
-                    command = "show interface terse media xe-"+fpc_slot+"*"
-                    result_show+= apply_command(netConf,command,"1.3",hostNamDev)
+                list_command = [v['after_reboot'] for k, v in list_commands_on_hd.items() if k in hd] or list_commands_on_hd['default']['after_reboot']
+                for command in list_command[0]:
+                    if '{fpc_slot}' in command:
+                        command=command.format(fpc_slot=fpc_slot)
+                    if command==f"show chassis fpc {fpc_slot} detail" and not pd.isna(planning_time['Ngày kết thúc']) and not pd.isna(planning_time['Thời gian ký']):
+                        output=apply_command(netConf, command, "1.3",hostNamDev)
+                        output_replace, new_starttime = replace_starttime(output, r"^(.*?)(\s+)\d{4}-\d{2}-\d{2}\s+\d{2}:(\d{2}):(\d{2})(\s+.*)$", rf"\g<1>\g<2>{planning_time['Thời gian ký'].strftime('%Y-%m-%d %H:%M:%S')}\g<5>")
+                        result_show+=output_replace
+                    else:
+                        result_show+=apply_command(netConf,command,"1.3",hostNamDev)
                 netConf.close()
                 if result_show!='':
                     result_write_file+=result_show

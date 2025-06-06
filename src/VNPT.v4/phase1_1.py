@@ -418,7 +418,7 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
         # name_tram=unique_bbbg["name_tram"]
         # tail=unique_bbbg["tail"]
         bbbg_file=docx.Document(os.path.join(hopdong_dir, unique_bbbg['net'], unique_bbbg["tail"]+'.docx'))
-        list_host=bbbg.loc[(bbbg['tail'] == unique_bbbg['tail']) & (bbbg['ma_HD'] == unique_bbbg['ma_HD']) & (bbbg['net'] == unique_bbbg['net'])]['Hostname']
+        list_host=bbbg.loc[(bbbg['tail'] == unique_bbbg['tail']) & (bbbg['ma_HD'] == unique_bbbg['ma_HD']) & (bbbg['net'] == unique_bbbg['net'])]['Hostname'].unique()
         unique_bbbg['host_name']=', '.join(listSN.loc[listSN['BBBG'] == unique_bbbg['tail']]['PartNumber'].unique())
         atp_file = copy.deepcopy(docx.Document(template))
         try:
