@@ -63,11 +63,20 @@ _RE_view:
 
 CBTable:
   rpc: get-environment-cb-information
-  args:
-    slot: '2'
   item: //environment-component-item
   key: name
   view: _CB_view
 _CB_view:
   fields:
+    name: name
+    state: state
+
+SFBTable:
+  rpc: get-environment-sfb-information
+  item: //environment-component-item
+  key: name
+  view: _SFB_view
+_SFB_view:
+  fields:
+    name: name
     state: state

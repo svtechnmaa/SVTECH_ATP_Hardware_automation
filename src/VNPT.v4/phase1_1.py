@@ -372,6 +372,9 @@ def delete_column_in_table(table, columns):
     return grid
 
 def set_cell_text(tables, list_keyword, new_data):
+    font_name = 'Times New Roman'
+    font_size = Pt(12)
+    alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.LEFT
     for table in tables:
         for row in table.rows:
             for cell in row.cells:
@@ -379,13 +382,18 @@ def set_cell_text(tables, list_keyword, new_data):
                 if len(matching)>0:
                     for i in matching:
                         if new_data[i]:
-                            font_name=cell.paragraphs[0].runs[0].font.name
-                            font_size=cell.paragraphs[0].runs[0].font.size
+                            if cell.paragraphs and cell.paragraphs[0].runs:
+                                font_name=cell.paragraphs[0].runs[0].font.name
+                                font_size=cell.paragraphs[0].runs[0].font.size
+                                alignment=cell.paragraphs[0].alignment
                             cell.text=re.sub(r'<{}>'.format(i), new_data[i], cell.text, flags=re.IGNORECASE)
-                            cell.paragraphs[0].runs[0].font.size= font_size
-                            cell.paragraphs[0].runs[0].font.name = font_name
-                            if 'serial' in i.lower():
-                                cell.paragraphs[0].alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+                            for paragraph in cell.paragraphs:
+                                paragraph.runs[0].font.size = font_size
+                                paragraph.runs[0].font.name = font_name
+                                paragraph.paragraph_format.left_indent = Pt(0)
+                                paragraph.paragraph_format.space_before = Pt(0)
+                                paragraph.paragraph_format.space_after = Pt(0)
+                                paragraph.alignment = alignment
 
 def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
     print("Generating atp template")
@@ -415,6 +423,7 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
     )
     # listSN['fpc_type_variable'] = '<serial_number_here'+listSN['PartNumber'].apply(lambda x: '_'+re.search("MPC(.*?)-",x).group(1) if re.search("MPC(.*?)-",x) else '').astype(str)+listSN['Throughput'].apply(lambda x:'_'+x if x is not None else '').astype(str)+'>'
     for index, unique_bbbg in unique_bbbg_hd.iterrows():
+        print("Generating ATP for BBBG: {}".format(unique_bbbg['tail']))
         # name_tram=unique_bbbg["name_tram"]
         # tail=unique_bbbg["tail"]
         bbbg_file=docx.Document(os.path.join(hopdong_dir, unique_bbbg['net'], unique_bbbg["tail"]+'.docx'))

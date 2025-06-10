@@ -101,9 +101,12 @@ def get_master_RE(netconf):
     device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netconf,tableview_file='../hardwareTable.yml',data_type='RE',output_format='dataframe')
     return device_hardware.loc[device_hardware['State'] == 'master'].iloc[0]['Slot']
 
-def get_state_cb2(netconf):
-    device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netconf,tableview_file='../hardwareTable.yml',data_type='CB', include_hostname=False,output_format='dataframe')
-    return device_hardware.iloc[0]['state']
+def get_state_cb_sfb(netconf, type, slot):
+    device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netconf,tableview_file='../hardwareTable.yml',data_type=type.upper(), include_hostname=False,output_format='dataframe')
+    # if isinstance(device_hardware, pd.DataFrame) and not device_hardware.empty:
+    return device_hardware.loc[device_hardware['name'] == f'{type.upper()} {slot}'].iloc[0]['state']
+    # device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netconf,tableview_file='../hardwareTable.yml',data_type=type.upper(), include_hostname=False,output_format='dataframe')
+    # return device_hardware.iloc[0]['state']
 
 def OnlineFpc(netConf, HostName, fpc_slot, fpc_sn, step):
     print("Step "+step+": Online MPC: ... Waiting")
@@ -122,15 +125,13 @@ def RebootFpc(netConf,HostName, fpc_slot, fpc_sn,step):
     output=apply_command(netConf,command,"1.3",HostName)
     return output
 
-def OnlineCB(netConf, HostName, step):
-    command = "request chassis cb online slot 2"
-    print("Step "+step+": Online CB 2: ... Waiting")
-    return apply_command(netConf,command,step,HostName)
+def OnlineCB_SFB(netConf, type, slot, HostName, step):
+    print(f"Step {step}: Online {type} {slot}: ... Waiting")
+    return apply_command(netConf,f"request chassis {type} online slot {slot}",step,HostName)
 
-def RebootCB(netConf,HostName, step):
-    print("Step "+step+": Offline CB 2: ... Waiting")
-    command = "request chassis cb offline slot 2"
-    return apply_command(netConf,command,step,HostName)
+def RebootCB_SFB(netConf, type, slot, HostName, step):
+    print(f"Step {step}: Offline {type} {slot}: ... Waiting")
+    return apply_command(netConf,f"request chassis {type} offline slot {slot}",step,HostName)
 
 def update_db(conn_db, hostname, SN, status, hd):
     time_current=time.time()
@@ -235,12 +236,18 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                             "show chassis pic fpc-slot {fpc_slot} pic-slot 0", "show chassis pic fpc-slot {fpc_slot} pic-slot 1", "show interface terse media et-{fpc_slot}*", "show interface terse media xe-{fpc_slot}*", "show interfaces diagnostics optics et-{interface}", "show interfaces diagnostics optics xe-{interface}"],
             'after_reboot': ["show chassis fpc {fpc_slot} detail", "show chassis fpc pic-status {fpc_slot}", "show interface terse media et-{fpc_slot}*", "show interface terse media et-{fpc_slot}*", "show interface terse media xe-{fpc_slot}*"]
         },
+        '117-2025':{
+            'before_reboot': ['show chassis hardware models', 'show chassis hardware', 'show chassis fpc', "show chassis fpc {fpc_slot} detail", "show chassis fpc pic-status {fpc_slot}",
+                               "show chassis pic fpc-slot {fpc_slot} pic-slot 0", "show chassis pic fpc-slot {fpc_slot} pic-slot 1", "show interface terse media et-{fpc_slot}*", "show interfaces diagnostics optics et-{interface}"],
+            'after_reboot': ["show chassis fpc {fpc_slot} detail", "show chassis fpc pic-status {fpc_slot}", "show interface terse media et-{fpc_slot}*"]
+        },
         'default':{
             'before_reboot': ["show chassis hardware","show chassis fpc","show chassis fpc {fpc_slot} detail","show chassis fpc pic-status {fpc_slot}",
                             "show chassis pic fpc-slot {fpc_slot} pic-slot 0", "show chassis pic fpc-slot {fpc_slot} pic-slot 1", "show interface terse media et-{fpc_slot}*", "show interface terse media xe-{fpc_slot}*"],
             'after_reboot': ["show chassis fpc {fpc_slot} detail", "show chassis fpc pic-status {fpc_slot}", "show interface terse media et-{fpc_slot}*", "show interface terse media et-{fpc_slot}*", "show interface terse media xe-{fpc_slot}*"]
         }
     }
+    hd_commands=next((v for k, v in list_commands_on_hd.items() if k in hd), list_commands_on_hd['default'])
     ###Get list SN on device###
     t=1
     while t<=6:
@@ -366,9 +373,8 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             netConf = NetConf(IpHost, UserName, PassWord)
             result_show=""
             print("Step 1.2: raw log: ... Waiting")
-            list_command = [v['before_reboot'] for k, v in list_commands_on_hd.items() if k in hd] or list_commands_on_hd['default']['before_reboot']
             edited_starttime=None
-            for command in list_command[0]:
+            for command in hd_commands['before_reboot']:
                 if '{fpc_slot}' in command:
                     command=command.format(fpc_slot=fpc_slot)
                 if command==f"show chassis fpc {fpc_slot} detail" and not pd.isna(planning_time['Ngày kết thúc']) and not pd.isna(planning_time['Thời gian ký']):
@@ -593,8 +599,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 print("CHECK 11: get command output to ATP")
                 result_show=""
                 netConf = NetConf(IpHost, UserName, PassWord)
-                list_command = [v['after_reboot'] for k, v in list_commands_on_hd.items() if k in hd] or list_commands_on_hd['default']['after_reboot']
-                for command in list_command[0]:
+                for command in hd_commands['after_reboot']:
                     if '{fpc_slot}' in command:
                         command=command.format(fpc_slot=fpc_slot)
                     if command==f"show chassis fpc {fpc_slot} detail" and not pd.isna(planning_time['Ngày kết thúc']) and not pd.isna(planning_time['Thời gian ký']):
@@ -621,7 +626,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 time.sleep(3)
 
     print("Step 2.1: Power on chassis. Insert MPC into chassis, verify Linecards are present:... waiting")
-    if '510-2024' in hd:
+    if '510-2024' in hd or '117-2025' in hd:
         list_command = ["show chassis hardware models","show system license"]
     else:
         list_command = ["show chassis hardware","show system license"]
@@ -663,7 +668,19 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
     update_db(conn_db, hostname, fpc_sn,new_status, hd)
 
 def FirstStepModule(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, slot, hd,hostNamDev,log_dir):
+    list_commands_on_hd={
+        '510-2024':{
+            "commands": ['show chassis hardware models', 'show chassis hardware', "show interface terse media et-{card}*", "show interfaces diagnostics optics {int}-{module}"]
+        },
+        '126-2025':{
+            'commands': ['show chassis hardware models', 'show chassis hardware', "show interface terse media et-{card}*", 'show interfaces diagnostics optics et-{module}', "show interface terse media xe-{card}*", 'show interfaces diagnostics optics xe-{module}']
+        },
+        'default':{
+            "commands": ['show chassis hardware', "show interfaces diagnostics optics {int}-{module}"]
+        }
+    }
     t=1
+    list_command=next((v['commands'] for k, v in list_commands_on_hd.items() if k in hd), list_commands_on_hd['default']['commands'])
     while t<=6:
         try:
             if t>5:
@@ -709,17 +726,22 @@ def FirstStepModule(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db
             netConf = NetConf(IpHost, UserName, PassWord)
             print("Step 1.2: raw log: ... Waiting")
             result_write_file=""
-            if '510-2024' in hd:
-                for command in ['show chassis hardware models', 'show chassis hardware', "show interface terse media et-{}*".format(str(module_slot.split('/')[0]))]:
-                    result_write_file+=apply_command(netConf, command, "1.2",hostNamDev)
-            else:
-                result_write_file+=apply_command(netConf, 'show chassis hardware', "1.2",hostNamDev)
-            if module_throughput.startswith(('XFP','SFPP')):
-                result_write_file+=apply_command(netConf,"show interfaces diagnostics optics xe-{}".format(module_slot),"1.2",hostNamDev)
-            elif module_throughput.startswith(('QSFP','QDD')):
-                result_write_file+=apply_command(netConf,"show interfaces diagnostics optics et-{}".format(module_slot),"1.2",hostNamDev)
-            elif module_throughput.startswith('SFP'):
-                result_write_file+=apply_command(netConf,"show interfaces diagnostics optics ge-{}".format(module_slot),"1.2",hostNamDev)
+            int_check='xe' if module_throughput.startswith(('XFP','SFPP')) else \
+                 ('et' if module_throughput.startswith(('QSFP','QDD')) else \
+                 ('ge' if module_throughput.startswith('SFP') else None))
+            for command in list_command:
+                result_write_file+=apply_command(netConf, command.format(card=str(module_slot.split('/')[0]), int=int_check, module=module_slot), "1.2",hostNamDev)
+            # if '510-2024' in hd:
+            #     for command in ['show chassis hardware models', 'show chassis hardware', "show interface terse media et-{}*".format(str(module_slot.split('/')[0]))]:
+            #         result_write_file+=apply_command(netConf, command, "1.2",hostNamDev)
+            # else:
+            #     result_write_file+=apply_command(netConf, 'show chassis hardware', "1.2",hostNamDev)
+            # if module_throughput.startswith(('XFP','SFPP')):
+            #     result_write_file+=apply_command(netConf,"show interfaces diagnostics optics xe-{}".format(module_slot),"1.2",hostNamDev)
+            # elif module_throughput.startswith(('QSFP','QDD')):
+            #     result_write_file+=apply_command(netConf,"show interfaces diagnostics optics et-{}".format(module_slot),"1.2",hostNamDev)
+            # elif module_throughput.startswith('SFP'):
+            #     result_write_file+=apply_command(netConf,"show interfaces diagnostics optics ge-{}".format(module_slot),"1.2",hostNamDev)
             netConf.close()
             if result_write_file!="":
                 print("Step 1.2: Done: ... Complete")
@@ -815,6 +837,19 @@ def FirstStepLCA(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
     update_db(conn_db, hostname, lca_sn,new_status, hd)
 
 def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, sn, hd, request_reboot, hostNamDev, log_dir):
+    list_commands_on_hd={
+        '117-2025':{
+            'commands': ['show vmhost version', 'show chassis routing-engine', 'show vmhost hardware', 'show chassis hardware models', 'show chassis environment | match Routing Engine', 'show chassis hardware models', 'show chassis fabric summary', 'show chassis environment | match SFB', 'show chassis hardware models', 'show chassis environment psm', 'show chassis hardware models | match Fan', 'show chassis environment | match Fan', 'show chassis craft-interface'],
+            'slot': 7,
+            'type': 'sfb'
+        },
+        'default':{
+            'commands': ['show vmhost version', 'show chassis routing-engine', 'show vmhost hardware', 'show chassis hardware models', 'show chassis hardware', 'show chassis environment | match Routing Engine', 'show chassis hardware models', 'show chassis fabric summary', 'show chassis environment | match CB', 'show chassis hardware models', 'show chassis environment pem', 'show chassis hardware models | match Fan', 'show chassis environment | match Fan', 'show chassis craft-interface'],
+            'slot':2,
+            'type': 'cb'
+        }
+    }
+    chassis_detail=next((v for k, v in list_commands_on_hd.items() if k in hd), list_commands_on_hd['default'])
     result_write_file=''
     t=1
     while t<=6:
@@ -854,8 +889,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
             result_show=''
             netConf = NetConf(IpHost, UserName, PassWord)
             print("Step 1.1: Collect command output: ... Waiting")
-            list_command = ['show vmhost version', 'show chassis routing-engine', 'show vmhost hardware', 'show chassis hardware models', 'show chassis hardware', 'show chassis environment | match Routing Engine', 'show chassis hardware models', 'show chassis fabric summary', 'show chassis environment | match CB', 'show chassis hardware models', 'show chassis environment pem', 'show chassis hardware models | match Fan', 'show chassis environment | match Fan', 'show chassis craft-interface']
-            for command in list_command:
+            for command in chassis_detail['commands']:
                 result_show+=apply_command(netConf, command, "1.1",hostNamDev)
             print("Step 1.1: Done: ... Complete")
             netConf.close()
@@ -907,6 +941,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                     t+=1
                     logging.exception('Error getting routing engine of {}, {}'.format(IpHost,err))
                     print('Error getting routing engine of {}, {}'.format(IpHost,err))
+        t=1
         while t<=21:
             try:
                 if t>20:
@@ -961,7 +996,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 time.sleep(20)
 
         print(f"CHECK 3: Offline/Online SCB/SFB : ... Waiting")
-        print("Step 3.1: check status CB 2 and online if offline")
+        print(f"Step 3.1: check status {chassis_detail['type']} {chassis_detail['slot']} and online if offline")
         t=1
         while t<=21:
             try:
@@ -970,22 +1005,22 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                     logging.critical("operation X exceed 20 retry, exiting")
                     raise Exception
                 netConf = NetConf(IpHost, UserName, PassWord)
-                cb2_state = get_state_cb2(netConf)
-                if cb2_state == "Offline":
-                    print(f"Step 3.1.1: CB 2 status is {cb2_state}. ONLINE to start ATP")
-                    OnlineCB(netConf,hostNamDev,"3.1.1")
+                cb_state = get_state_cb_sfb(netConf, type=chassis_detail['type'], slot=chassis_detail['slot'])
+                if cb_state == "Offline":
+                    print(f"Step 3.1.1: {chassis_detail['type']} {chassis_detail['slot']} status is {cb_state}. ONLINE to start ATP")
+                    OnlineCB_SFB(netConf,chassis_detail['type'],chassis_detail['slot'], hostNamDev,"3.1.1")
                     time.sleep(10)
                     netConf.close()
                     continue
-                elif cb2_state=="Online":
-                    print(f"Step 3.1: CB 2 status is {cb2_state}")
+                elif cb_state=="Online":
+                    print(f"Step 3.1: {chassis_detail['type']} {chassis_detail['slot']} status is {cb_state}")
                     netConf.close()
                     break
                 else:
-                    print("Step 3.1.2: Waiting CB 2 online")
+                    print(f"Step 3.1.2: Waiting {chassis_detail['type']} {chassis_detail['slot']} online")
                     t+=1
                     netConf.close()
-                    print(f"Step 3.1.2: CB 2 status is {cb2_state}")
+                    print(f"Step 3.1.2: {chassis_detail['type']} {chassis_detail['slot']} status is {cb_state}")
                     print("Step 3.1.2: Waiting 30s...Waiting")
                     time.sleep(30)
             except exception.ConnectError as err:
@@ -1001,31 +1036,31 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 print(err)
                 time.sleep(3)
         t=1
-        print("Step 3.2: Reboot CB 2")
+        print(f"Step 3.2: Reboot {chassis_detail['type']} {chassis_detail['slot']}")
         while t<=21:
             try:
                 if t>20:
                     print("operation X exceed 20 retry, exiting")
                     logging.critical("operation X exceed 20 retry, exiting")
                     raise Exception
-                print("Step 3.2.1: check CB 2 state")
+                print(f"Step 3.2.1: check {chassis_detail['type']} {chassis_detail['slot']} state")
                 netConf = NetConf(IpHost, UserName, PassWord)
-                cb2_state = get_state_cb2(netConf)
-                if cb2_state == "Online":
-                    print("Step 3.2.1: CB 2 status is "+cb2_state)
-                    result_show= RebootCB(netConf,hostNamDev,"1.3")
+                cb_state = get_state_cb_sfb(netConf,type=chassis_detail['type'], slot=chassis_detail['slot'])
+                if cb_state == "Online":
+                    print(f"Step 3.2.1: {chassis_detail['type']} {chassis_detail['slot']} status is "+cb_state)
+                    result_show= RebootCB_SFB(netConf,chassis_detail['type'],chassis_detail['slot'],hostNamDev,"1.3")
                     netConf.close()
                     time.sleep(5)
                     continue
-                elif cb2_state == "Offline":
-                    print("Step 3.2.1: CB 2 status is "+cb2_state)
+                elif cb_state == "Offline":
+                    print(f"Step 3.2.1: {chassis_detail['type']} {chassis_detail['slot']} status is "+cb_state)
                     result_write_file+=result_show
                     netConf.close()
                     break
                 else:
                     t+=1
                     netConf.close()
-                    print("Step 3.2.1: CB 2 status is "+cb2_state)
+                    print(f"Step 3.2.1: {chassis_detail['type']} {chassis_detail['slot']} status is "+cb_state)
                     print("Step 3.2.1: Waiting 30s...Waiting")
                     time.sleep(30)
             except exception.ConnectError as err:
@@ -1040,7 +1075,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 logging.exception(err)
                 print(err)
                 time.sleep(3)
-        print("Step 3.3: Check CB 2")
+        print(f"Step 3.3: Check {chassis_detail['type']} {chassis_detail['slot']}")
         t=1
         while t<=6:
             try:
@@ -1049,7 +1084,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                     logging.critical("operation X exceed 5 retry, exiting")
                     raise Exception
                 netConf = NetConf(IpHost, UserName, PassWord)
-                result_show= apply_command(netConf,'show chassis environment cb 2',"3.3",hostNamDev)
+                result_show= apply_command(netConf,f"show chassis environment {chassis_detail['type']} {chassis_detail['slot']}","3.3",hostNamDev)
                 netConf.close()
                 if result_show:
                     result_write_file+=result_show
@@ -1066,7 +1101,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 logging.exception(err)
                 print(err)
                 time.sleep(3)
-        print("Step 3.4: Online CB 2")
+        print(f"Step 3.4: Online {chassis_detail['type']} {chassis_detail['slot']}")
         while t<=21:
             try:
                 if t>20:
@@ -1074,22 +1109,22 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                     logging.critical("operation X exceed 20 retry, exiting")
                     raise Exception
                 netConf = NetConf(IpHost, UserName, PassWord)
-                cb2_state = get_state_cb2(netConf)
-                if cb2_state == "Offline":
-                    print("Step 3.4.1: CB 2 status is "+cb2_state)
-                    result_show = OnlineCB(netConf,hostNamDev,"3.4.1")
+                cb_state = get_state_cb_sfb(netConf, type=chassis_detail['type'], slot=chassis_detail['slot'])
+                if cb_state == "Offline":
+                    print(f"Step 3.4.1: {chassis_detail['type']} {chassis_detail['slot']} status is "+cb_state)
+                    result_show = OnlineCB_SFB(netConf,chassis_detail['type'],chassis_detail['slot'],hostNamDev,"3.4.1")
                     netConf.close()
                     time.sleep(10)
                     continue
-                elif cb2_state=="Online":
-                    print("Step 3.4: CB 2 status is "+cb2_state)
+                elif cb_state=="Online":
+                    print(f"Step 3.4: {chassis_detail['type']} {chassis_detail['slot']} status is "+cb_state)
                     result_write_file+=result_show
                     netConf.close()
                     break
                 else:
                     t+=1
                     netConf.close()
-                    print("Step 3.4.1: CB 2 status is "+cb2_state)
+                    print(f"Step 3.4.1: {chassis_detail['type']} {chassis_detail['slot']} status is "+cb_state)
                     print("Step 3.4.1: Waiting 30s...Waiting")
                     time.sleep(30)
             except exception.ConnectError as err:
@@ -1104,7 +1139,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 print(err)
                 logging.exception(err)
                 time.sleep(3)
-        print("Step 3.5: Check CB 2")
+        print(f"Step 3.5: Check {chassis_detail['type']} {chassis_detail['slot']}")
         t=1
         while t<=6:
             try:
@@ -1113,7 +1148,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                     logging.critical("operation X exceed 5 retry, exiting")
                     raise Exception
                 netConf = NetConf(IpHost, UserName, PassWord)
-                result_show= apply_command(netConf,'show chassis environment cb 2',"3.5",hostNamDev)
+                result_show= apply_command(netConf,f"show chassis environment {chassis_detail['type']} {chassis_detail['slot']}","3.5",hostNamDev)
                 netConf.close()
                 if result_show:
                     result_write_file+=result_show

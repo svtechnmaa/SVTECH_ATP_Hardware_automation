@@ -26,8 +26,7 @@ def create_input_component(input_vars, phase, values={}):
         match config['widget']:
             case 'file_uploader':
                 if values:
-                    print(111, values, name)
-                    st.text_input(config['label'],value=values[name].name if hasattr(values[name], "name") else os.path.basename(values[name]), disabled=True)
+                    st.text_input(config['label'],value=None if values[name] is None else values[name].name if hasattr(values[name], "name") else os.path.basename(values[name]), disabled=True)
                 else:
                     st.session_state[f'input_data_phase_{phase}'][name] = st.file_uploader(config['label'], type=config['accept_value'], key=key)
             case 'selectbox':
@@ -106,22 +105,28 @@ def create_sheet_components(input_vars, phase, value={}):
             if not value:
                 update_sheet_selection(label=f'Select {var} sheet', root_key=f'input_data_phase_{phase}', file=var, sheet=f'{var}_sheet', sheet_key=f"phase_{phase}_{var}_sheet")
             else:
-                with st.session_state[f'input_data_phase_{phase}'][f'{var}_sheet_wrapper']:
-                    st.session_state[f'input_data_phase_{phase}'][f'{var}_sheet']=st.selectbox(f'Select {var} sheet', [value[f'{var}_sheet']], key=f"phase_{phase}_{var}_sheet", disabled=True)
+                if f'{var}_sheet' in value and value[f'{var}_sheet'] is not None:
+                    with st.session_state[f'input_data_phase_{phase}'][f'{var}_sheet_wrapper']:
+                        st.session_state[f'input_data_phase_{phase}'][f'{var}_sheet']=st.selectbox(f'Select {var} sheet', [value[f'{var}_sheet']], key=f"phase_{phase}_{var}_sheet", disabled=True)
 
 def update_sheet_selection(root_key, file, sheet, label, sheet_key, value={}):
     if value:
         with st.session_state[root_key][f'{sheet}_wrapper']:
             st.selectbox(label, [value], key=sheet_key, disabled=True)
     else:
-        if file in st.session_state[root_key].keys() and st.session_state[root_key][file] and st.session_state[root_key][file].name.endswith('.xlsx'):
-            try:
-                workbook = load_workbook(st.session_state[root_key][file])
-                sheet_names = workbook.sheetnames
-                with st.session_state[root_key][f'{sheet}_wrapper']:
-                    st.session_state[root_key][sheet]=st.selectbox(label, sheet_names, key=sheet_key)
-            except Exception as e:
-                st.error(f"Error reading Excel file: {e}")
+        if file in st.session_state[root_key].keys() and st.session_state[root_key][file] is not None:
+            if st.session_state[root_key][file].name.endswith('.xlsx'):
+                try:
+                    workbook = load_workbook(st.session_state[root_key][file])
+                    sheet_names = workbook.sheetnames
+                    with st.session_state[root_key][f'{sheet}_wrapper']:
+                        st.session_state[root_key][sheet]=st.selectbox(label, sheet_names, key=sheet_key, index=0)
+                except Exception as e:
+                    st.error(f"Error reading Excel file: {e}")
+            else:
+                st.session_state[root_key][sheet]=None
+        else:
+            st.session_state[root_key][sheet]=None
 
 def format_duration(td: timedelta) -> str:
     total_seconds = td.total_seconds()
@@ -255,8 +260,8 @@ def get_list_host(database, hd):
 
 def get_list_sn(database, hd, host):
     conn = sqlite3.connect(database)
-    df=pd.read_sql_query("SELECT Hostname, RealSlot, TestStatus, SN, Type FROM 'checkSN' where RealSlot IS NOT NULL and TestStatus IN ('Installed','Checked without reboot', 'Checked with reboot','Checked') and Hostname=(?) and Type in ('fpc','module','lca') and ma_HD=(?)" , conn, params=(host,hd))
-    df['RealSlot'] = df['RealSlot'].apply(str)
+    df=pd.read_sql_query("SELECT Hostname, RealSlot, TestStatus, SN, Type FROM 'checkSN' where TestStatus IN ('Installed','Checked without reboot', 'Checked with reboot','Checked') and Hostname=(?) and Type in ('fpc','module','lca','chassis') and ma_HD=(?)" , conn, params=(host,hd))
+    df['RealSlot'] = df['RealSlot'].fillna(value='').apply(str)
     df['host-slot'] = df['Hostname']+' - '+df['Type']+ ' '+df['SN']+' - Slot ' + df['RealSlot']+' - '+df['TestStatus']
     return df['host-slot'].unique().tolist()
     # st.session_state[f'{phase}_hostslot_options'] = df['host-slot'].unique().tolist()

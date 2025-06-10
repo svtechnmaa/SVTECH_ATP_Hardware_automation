@@ -76,7 +76,7 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd):
     try:
         tables=atp_file.tables
         for table in tables:
-            if '510-2024' in hd and "Output-1-" in table.cell(0,0).paragraphs[0].text:
+            if ('510-2024' in hd or '117-2025' in hd) and "Output-1-" in table.cell(0,0).paragraphs[0].text:
                 host=re.search("Output-1-(.*)",table.cell(0,0).paragraphs[0].text).group(1)
                 matching = [f for f in list_log_file if f'{host}_Chassis' in f]
                 if not matching:
@@ -90,7 +90,10 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd):
                 for i in range(len(lines)):
                     if f'@{host}>' in lines[i]:
                         line_index.append(i)
-                output={'Output-1':lines[:line_index[6]], 'Output-2':lines[line_index[6]:line_index[9]], 'Output-3':lines[line_index[9]:line_index[11]], 'Output-4':lines[line_index[11]:line_index[13]], 'Output-5':lines[line_index[13]:line_index[14]], 'Output-7':lines[line_index[14]:]}
+                if '510' in hd:
+                    output={'Output-1':lines[:line_index[6]], 'Output-2':lines[line_index[6]:line_index[9]], 'Output-3':lines[line_index[9]:line_index[11]], 'Output-4':lines[line_index[11]:line_index[13]], 'Output-5':lines[line_index[13]:line_index[14]], 'Output-7':lines[line_index[14]:]}
+                elif '117-2025' in hd:
+                    output={'Output-1':lines[:line_index[5]], 'Output-2':lines[line_index[5]:line_index[8]], 'Output-3':lines[line_index[8]:line_index[10]], 'Output-4':lines[line_index[10]:line_index[12]], 'Output-5':lines[line_index[12]:line_index[13]], 'Output-7':lines[line_index[13]:]}
                 for line in output['Output-1']:
                     run = table.cell(0,0).add_paragraph().add_run(line.strip("\n"))
                     run.font.size  = Pt(9)
@@ -107,7 +110,7 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd):
                             run.font.name = 'Courier New'
                             if "@" in line and '>' in line:
                                 run.font.bold = True
-            elif ('510-2024' in hd and "Output-6-" in table.cell(0,0).paragraphs[0].text) or ('510-2024' not in hd and "Output-1-" in table.cell(0,0).paragraphs[0].text):
+            elif (('510-2024' in hd or '117-2025' in hd) and "Output-6-" in table.cell(0,0).paragraphs[0].text) or ('510-2024' not in hd and '117-2025' not in hd and "Output-1-" in table.cell(0,0).paragraphs[0].text):
                 host=re.search("Output-(1|6)-(.*)",table.cell(0,0).paragraphs[0].text).group(2)
                 matching = [f for f in list_log_file if re.search(rf'{re.escape(host)}_(FPC|Module|LCA)', f)]
                 if not matching:
@@ -138,7 +141,7 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd):
                     elif 'Module' in log:
                         # If only have module in host, get only 1 command show chassis hardware
                         if not any('FPC' in t for t in matching):
-                            if '510-2024' in hd:
+                            if '510-2024' in hd or '117-2025' in hd:
                                 dict_output_module[fname.stat().st_mtime]=lines[(line_index[0]-1):(line_index[2]-1)]
                             else:
                                 dict_output_module[fname.stat().st_mtime]=lines[(line_index[0]-1):(line_index[1]-1)]
@@ -167,7 +170,7 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd):
                         run.font.size  = Pt(9)
                         run.font.name = 'Courier New'
                 for table2 in tables:
-                    if ('510-2024' not in hd and "Output-2-"+host in table2.cell(0,0).paragraphs[0].text) or ('510-2024' in hd and "Output-8-"+host in table2.cell(0,0).paragraphs[0].text):
+                    if ('510-2024' not in hd and '117-2025' not in hd and "Output-2-"+host in table2.cell(0,0).paragraphs[0].text) or (('510-2024' in hd or '117-2025' in hd) and "Output-8-"+host in table2.cell(0,0).paragraphs[0].text):
                         #Delete table license result if only module in host
                         if len(matching)>0 and all('Module' in t for t in matching):
                             table2._element.getparent().remove(table2._element)
@@ -175,7 +178,7 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd):
                             tmp=1
                             for item in all_paragraph:
                                 if item.text==host:
-                                    if ('510-2024' not in hd and tmp==2) or ('510-2024' in hd and (tmp==8 if any("Chassis" in item for item  in list_log_file) else tmp==2)):
+                                    if ('510-2024' not in hd and '117-2025' not in hd and tmp==2) or (('510-2024' in hd or '117-2025' in hd) and (tmp==8 if any("Chassis" in item for item  in list_log_file) else tmp==2)):
                                         delete_paragraph(item)
                                     else:
                                         tmp+=1
@@ -196,7 +199,7 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd):
             tmp=1
             for item in atp_file.paragraphs:
                 if 'Kết quả test' in item.text:
-                    if ('510-2024' not in hd and tmp==2) or ('510-2024' in hd and tmp==8):
+                    if ('510-2024' not in hd and '117-2025' not in hd and tmp==2) or (('510-2024' in hd or '117-2025' in hd) and tmp==8):
                         #Create empty table license result if bbbg only has module
                         new_table=atp_file.add_table(rows=1, cols=1)
                         cell_border_style =  {
