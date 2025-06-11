@@ -17,6 +17,10 @@ if utils_dir_path not in sys.path:
     sys.path.insert(0, utils_dir_path)
 from module_utils import *
 
+class MaxRetriesExceeded(Exception):
+    """Raised when an operation exceeds its maximum allowed retries."""
+    pass
+
 def NetConf(host, username, password):
     print("Netconf")
     NetConfSsh = Device(host=host, user=username, passwd=password, port=22)
@@ -88,7 +92,7 @@ def check_fpc_status(netConf,fpc_slot,step,HostName):
     return fpc_state, dict_pic
 
 def get_module_in_fpc(netconf, slot):
-    device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netconf,tableview_file='../hardwareTable.yml',data_type='Module', include_hostname=False,output_format='dataframe')
+    device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netconf,tableview_file=os.path.join(current_script_dir, '../hardwareTable.yml'),data_type='Module', include_hostname=False,output_format='dataframe')
     if not device_hardware.empty:
         tempData = device_hardware.loc[device_hardware['fpc_slot'] == 'FPC '+slot]
         if not tempData.empty:
@@ -98,11 +102,11 @@ def get_module_in_fpc(netconf, slot):
     return []
 
 def get_master_RE(netconf):
-    device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netconf,tableview_file='../hardwareTable.yml',data_type='RE',output_format='dataframe')
+    device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netconf,tableview_file=os.path.join(current_script_dir, '../hardwareTable.yml'),data_type='RE',output_format='dataframe')
     return device_hardware.loc[device_hardware['State'] == 'master'].iloc[0]['Slot']
 
 def get_state_cb_sfb(netconf, type, slot):
-    device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netconf,tableview_file='../hardwareTable.yml',data_type=type.upper(), include_hostname=False,output_format='dataframe')
+    device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netconf,tableview_file=os.path.join(current_script_dir, '../hardwareTable.yml'),data_type=type.upper(), include_hostname=False,output_format='dataframe')
     # if isinstance(device_hardware, pd.DataFrame) and not device_hardware.empty:
     return device_hardware.loc[device_hardware['name'] == f'{type.upper()} {slot}'].iloc[0]['state']
     # device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netconf,tableview_file='../hardwareTable.yml',data_type=type.upper(), include_hostname=False,output_format='dataframe')
@@ -232,9 +236,9 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             'after_reboot': ["show chassis fpc {fpc_slot} detail", "show chassis fpc pic-status {fpc_slot}", "show interface terse media et-{fpc_slot}*"]
         },
         '126-2025':{
-            'before_reboot': ["show chassis hardware","show chassis fpc","show chassis fpc {fpc_slot} detail","show chassis fpc pic-status {fpc_slot}",
-                            "show chassis pic fpc-slot {fpc_slot} pic-slot 0", "show chassis pic fpc-slot {fpc_slot} pic-slot 1", "show interface terse media et-{fpc_slot}*", "show interface terse media xe-{fpc_slot}*", "show interfaces diagnostics optics et-{interface}", "show interfaces diagnostics optics xe-{interface}"],
-            'after_reboot': ["show chassis fpc {fpc_slot} detail", "show chassis fpc pic-status {fpc_slot}", "show interface terse media et-{fpc_slot}*", "show interface terse media et-{fpc_slot}*", "show interface terse media xe-{fpc_slot}*"]
+            'before_reboot': ["show chassis hardware models","show chassis hardware","show chassis fpc","show chassis fpc {fpc_slot} detail","show chassis fpc pic-status {fpc_slot}",
+                            "show chassis pic fpc-slot {fpc_slot} pic-slot 0", "show chassis pic fpc-slot {fpc_slot} pic-slot 1", "show interface terse media et-{fpc_slot}*", "show interfaces diagnostics optics et-{interface}", "show interface terse media xe-{fpc_slot}*", "show interfaces diagnostics optics xe-{interface}"],
+            'after_reboot': ["show chassis fpc {fpc_slot} detail", "show chassis fpc pic-status {fpc_slot}", "show interface terse media et-{fpc_slot}*","show interface terse media xe-{fpc_slot}*"]
         },
         '117-2025':{
             'before_reboot': ['show chassis hardware models', 'show chassis hardware', 'show chassis fpc', "show chassis fpc {fpc_slot} detail", "show chassis fpc pic-status {fpc_slot}",
@@ -244,7 +248,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
         'default':{
             'before_reboot': ["show chassis hardware","show chassis fpc","show chassis fpc {fpc_slot} detail","show chassis fpc pic-status {fpc_slot}",
                             "show chassis pic fpc-slot {fpc_slot} pic-slot 0", "show chassis pic fpc-slot {fpc_slot} pic-slot 1", "show interface terse media et-{fpc_slot}*", "show interface terse media xe-{fpc_slot}*"],
-            'after_reboot': ["show chassis fpc {fpc_slot} detail", "show chassis fpc pic-status {fpc_slot}", "show interface terse media et-{fpc_slot}*", "show interface terse media et-{fpc_slot}*", "show interface terse media xe-{fpc_slot}*"]
+            'after_reboot': ["show chassis fpc {fpc_slot} detail", "show chassis fpc pic-status {fpc_slot}", "show interface terse media et-{fpc_slot}*", "show interface terse media xe-{fpc_slot}*"]
         }
     }
     hd_commands=next((v for k, v in list_commands_on_hd.items() if k in hd), list_commands_on_hd['default'])
@@ -255,7 +259,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             if t>5:
                 logging.critical("operation X exceed 5 retry, exiting")
                 print("operation X exceed 5 retry, exiting")
-                raise Exception
+                raise MaxRetriesExceeded
             netConf=NetConf(IpHost, UserName, PassWord)
             print("First_step get list SN on host")
             device_hardware = CheckSn(netConf,'fpc')
@@ -263,15 +267,18 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             if device_hardware is not None:
                 break
         except exception.ConnectError as err:
-                t+=1
-                print('Error connect to {}, {}'.format(IpHost,err))
-                logging.exception('Error connect to {}, {}'.format(IpHost,err))
-                continue
+            t+=1
+            print('Error connect to {}, {}'.format(IpHost,err))
+            logging.exception('Error connect to {}, {}'.format(IpHost,err))
+            continue
+        except MaxRetriesExceeded as err:
+            print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+            raise
         except Exception as err:
-                netConf.close()
-                t+=1
-                print('Error check SN of {}, {}'.format(IpHost,err))
-                logging.exception('Error check SN of {}, {}'.format(IpHost,err))
+            netConf.close()
+            t+=1
+            print('Error check SN of {}, {}'.format(IpHost,err))
+            logging.exception('Error check SN of {}, {}'.format(IpHost,err))
     planning_hardware=pd.read_sql_query("SELECT * FROM 'checkSN' where ma_HD=(?) and Hostname=(?) and Type='fpc' and RealSlot=(?) and (TestStatus='Installed' or TestStatus like 'Checked%')" , conn_db, params=(hd, hostname,slot))
     planning_time=pd.read_sql_query("""SELECT "Ngày kết thúc", "Thời gian ký" FROM BBBG WHERE ma_HD = ? AND Hostname = ?""", conn_db, params=(hd, hostname)).iloc[0]
     planning_time[["Ngày kết thúc", "Thời gian ký"]] = planning_time[["Ngày kết thúc", "Thời gian ký"]].apply(pd.to_datetime, errors='coerce')
@@ -290,7 +297,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             if t>20:
                 print("operation X exceed 20 retry, exiting")
                 logging.critical("operation X exceed 20 retry, exiting")
-                raise Exception
+                raise MaxRetriesExceeded
             print("CHECK 1: check status FPC")
             netConf = NetConf(IpHost, UserName, PassWord)
             fpc_state, dict_pic = check_fpc_status(netConf,fpc_slot,"1.3",hostNamDev)
@@ -313,6 +320,9 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 print("Step 1.1: FPC slot "+fpc_slot +" status is "+fpc_state)
                 print("Step 1.1: Waiting 30s...Waiting")
                 time.sleep(30)
+        except MaxRetriesExceeded as err:
+            print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+            raise
         except exception.ConnectError as err:
             t+=1
             print(err)
@@ -332,7 +342,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             if t>30:
                 print("operation X exceed 30 retry, exiting")
                 logging.critical("operation X exceed 30 retry, exiting")
-                raise Exception
+                raise MaxRetriesExceeded
             print("CHECK 4: check status PIC")
             netConf = NetConf(IpHost, UserName, PassWord)
             fpc_state, dict_pic = check_fpc_status(netConf,fpc_slot,"1.1",hostNamDev)
@@ -347,6 +357,9 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             t+=1
             print("Step 1.1: All PIC not ONLINE wait 20s...Waiting")
             time.sleep(20)
+        except MaxRetriesExceeded as err:
+            print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+            raise
         except exception.ConnectError as err:
             t+=1
             print(err)
@@ -368,7 +381,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             if t>5:
                 print("operation X exceed 5 retry, exiting")
                 logging.critical("operation X exceed 5 retry, exiting")
-                raise Exception
+                raise MaxRetriesExceeded
             print("CHECK 5: get command output to ATP")
             netConf = NetConf(IpHost, UserName, PassWord)
             result_show=""
@@ -398,6 +411,9 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             if result_show!='':
                 result_write_file+=result_show
                 break
+        except MaxRetriesExceeded as err:
+            print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+            raise
         except exception.ConnectError as err:
             t+=1
             print(err)
@@ -425,7 +441,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 if t>20:
                     print("operation X exceed 20 retry, exiting")
                     logging.critical("operation X exceed 20 retry, exiting")
-                    raise Exception
+                    raise MaxRetriesExceeded
                 print("CHECK 6: check FPC status")
                 netConf = NetConf(IpHost, UserName, PassWord)
                 fpc_state, dict_pic = check_fpc_status(netConf,fpc_slot,"1.3",hostNamDev)
@@ -447,6 +463,9 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                     print("Step 1.3: FPC slot "+fpc_slot +" status is "+fpc_state)
                     print("Step 1.3: Waiting 30s...Waiting")
                     time.sleep(30)
+            except MaxRetriesExceeded as err:
+                print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+                raise
             except exception.ConnectError as err:
                 t+=1
                 logging.exception(err)
@@ -467,7 +486,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 if t>5:
                     print("operation X exceed 5 retry, exiting")
                     logging.critical("operation X exceed 5 retry, exiting")
-                    raise Exception
+                    raise MaxRetriesExceeded
                 result_show=""
                 netConf = NetConf(IpHost, UserName, PassWord)
                 result_show= apply_command(netConf,"show chassis fpc","1.3",hostNamDev)
@@ -475,6 +494,9 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 if result_show!='':
                     result_write_file+=result_show
                     break
+            except MaxRetriesExceeded as err:
+                print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+                raise
             except exception.ConnectError as err:
                 t+=1
                 print(err)
@@ -495,7 +517,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 if t>20:
                     print("operation X exceed 20 retry, exiting")
                     logging.critical("operation X exceed 20 retry, exiting")
-                    raise Exception
+                    raise MaxRetriesExceeded
                 print("CHECK 8: Online FPC")
                 netConf = NetConf(IpHost, UserName, PassWord)
                 fpc_state, dict_pic = check_fpc_status(netConf,fpc_slot,"1.3",hostNamDev)
@@ -516,6 +538,9 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                     print("Step 1.3: FPC slot "+fpc_slot +" status is "+fpc_state)
                     print("Step 1.3: Waiting 30s...Waiting")
                     time.sleep(30)
+            except MaxRetriesExceeded as err:
+                print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+                raise
             except exception.ConnectError as err:
                 t+=1
                 logging.exception(err)
@@ -534,7 +559,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 if t>30:
                     print("operation X exceed 30 retry, exiting")
                     logging.critical("operation X exceed 30 retry, exiting")
-                    raise Exception
+                    raise MaxRetriesExceeded
                 print("CHECK 9: Online PIC")
                 netConf = NetConf(IpHost, UserName, PassWord)
                 fpc_state, dict_pic = check_fpc_status(netConf,fpc_slot,"1.1",hostNamDev)
@@ -549,6 +574,9 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 t+=1
                 print("Step 1.1: All PIC not ONLINE wait 20s...Waiting")
                 time.sleep(20)
+            except MaxRetriesExceeded as err:
+                print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+                raise
             except exception.ConnectError as err:
                 t+=1
                 logging.exception(err)
@@ -569,13 +597,16 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 if t>5:
                     print("operation X exceed 5 retry, exiting")
                     logging.critical("operation X exceed 5 retry, exiting")
-                    raise Exception
+                    raise MaxRetriesExceeded
                 netConf = NetConf(IpHost, UserName, PassWord)
                 result_show= apply_command(netConf,"show chassis fpc","1.3",hostNamDev)
                 netConf.close()
                 if result_show:
                     result_write_file+=result_show
                     break
+            except MaxRetriesExceeded as err:
+                print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+                raise
             except exception.ConnectError as err:
                 t+=1
                 print(err)
@@ -595,7 +626,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 if t>5:
                     print("operation X exceed 5 retry, exiting")
                     logging.critical("operation X exceed 5 retry, exiting")
-                    raise Exception
+                    raise MaxRetriesExceeded
                 print("CHECK 11: get command output to ATP")
                 result_show=""
                 netConf = NetConf(IpHost, UserName, PassWord)
@@ -612,6 +643,9 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 if result_show!='':
                     result_write_file+=result_show
                     break
+            except MaxRetriesExceeded as err:
+                print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+                raise
             except exception.ConnectError as err:
                 t+=1
                 logging.exception(err)
@@ -636,7 +670,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             if t>5:
                 print("operation X exceed 5 retry, exiting")
                 logging.critical("operation X exceed 5 retry, exiting")
-                raise Exception
+                raise MaxRetriesExceeded
             print("CHECK 12: get command output to ATP")
             result_show=""
             netConf=NetConf(IpHost, UserName, PassWord)
@@ -646,6 +680,9 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             if result_show!='':
                 result_write_file+=result_show
                 break
+        except MaxRetriesExceeded as err:
+            print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+            raise
         except exception.ConnectError as err:
             t+=1
             print(err)
@@ -686,13 +723,16 @@ def FirstStepModule(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db
             if t>5:
                 print("operation X exceed 5 retry, exiting")
                 logging.critical("operation X exceed 5 retry, exiting")
-                raise Exception
+                raise MaxRetriesExceeded
             netConf=NetConf(IpHost, UserName, PassWord)
             print("First_step get list SN on host")
             device_hardware = CheckSn(netConf,'module')
             netConf.close()
             if device_hardware is not None:
                 break
+        except MaxRetriesExceeded as err:
+            print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+            raise
         except exception.ConnectError as err:
                 t+=1
                 print('Error connect to {}, {}'.format(IpHost,err))
@@ -721,7 +761,7 @@ def FirstStepModule(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db
             if t>5:
                 print("operation X exceed 5 retry, exiting")
                 logging.critical("operation X exceed 5 retry, exiting")
-                raise Exception
+                raise MaxRetriesExceeded
             print("CHECK 1: get command output to ATP")
             netConf = NetConf(IpHost, UserName, PassWord)
             print("Step 1.2: raw log: ... Waiting")
@@ -752,6 +792,9 @@ def FirstStepModule(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db
                 print("Step 1.2:Writing log 1_2.txt: ... complete")
                 new_status="Checked"
                 break
+        except MaxRetriesExceeded as err:
+            print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+            raise
         except exception.ConnectError as err:
             t+=1
             logging.exception(err)
@@ -773,13 +816,16 @@ def FirstStepLCA(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             if t>5:
                 print("operation X exceed 5 retry, exiting")
                 logging.critical("operation X exceed 5 retry, exiting")
-                raise Exception
+                raise MaxRetriesExceeded
             netConf=NetConf(IpHost, UserName, PassWord)
             print("First_step get list SN on host")
             device_hardware = CheckSn(netConf,'lca')
             netConf.close()
             if device_hardware is not None:
                 break
+        except MaxRetriesExceeded as err:
+            print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+            raise
         except exception.ConnectError as err:
                 t+=1
                 logging.exception('Error connect to {}, {}'.format(IpHost,err))
@@ -803,7 +849,7 @@ def FirstStepLCA(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             if t>5:
                 print("operation X exceed 5 retry, exiting")
                 logging.critical("operation X exceed 5 retry, exiting")
-                raise Exception
+                raise MaxRetriesExceeded
             print("CHECK 1: get command output to ATP")
             netConf = NetConf(IpHost, UserName, PassWord)
             print("Step 1.2: raw log: ... Waiting")
@@ -822,6 +868,9 @@ def FirstStepLCA(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 print("Step 1.2:Writing log 1_2.txt: ... complete")
                 new_status="Checked"
                 break
+        except MaxRetriesExceeded as err:
+            print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+            raise
         except exception.ConnectError as err:
             t+=1
             logging.exception(err)
@@ -857,13 +906,16 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
             if t>5:
                 print("operation X exceed 5 retry, exiting")
                 logging.critical("operation X exceed 5 retry, exiting")
-                raise Exception
+                raise MaxRetriesExceeded
             netConf=NetConf(IpHost, UserName, PassWord)
             print("First_step get list SN on host")
             device_hardware = CheckSn(netConf,'chassis')
             netConf.close()
             if device_hardware is not None:
                 break
+        except MaxRetriesExceeded as err:
+            print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+            raise
         except exception.ConnectError as err:
                 t+=1
                 logging.exception('Error connect to {}, {}'.format(IpHost,err))
@@ -884,7 +936,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
             if t>5:
                 print("operation X exceed 5 retry, exiting")
                 logging.critical("operation X exceed 5 retry, exiting")
-                raise Exception
+                raise MaxRetriesExceeded
             print("CHECK 1: get command output to ATP")
             result_show=''
             netConf = NetConf(IpHost, UserName, PassWord)
@@ -896,6 +948,9 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
             if result_show!='':
                 result_write_file+=result_show
                 break
+        except MaxRetriesExceeded as err:
+            print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+            raise
         except exception.ConnectError as err:
             t+=1
             logging.exception(err)
@@ -921,7 +976,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 if t>5:
                     print("operation X exceed 5 retry, exiting")
                     logging.critical("operation X exceed 5 retry, exiting")
-                    raise Exception
+                    raise MaxRetriesExceeded
                 netConf=NetConf(IpHost, UserName, PassWord)
                 print("Step 2.1.1: Getting routing engine master slot")
                 result_show=""
@@ -931,6 +986,9 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 if master_slot.isdigit() and result_show:
                     result_write_file+=result_show
                     break
+            except MaxRetriesExceeded as err:
+                print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+                raise
             except exception.ConnectError as err:
                     t+=1
                     print('Error connect to {}, {}'.format(IpHost,err))
@@ -947,7 +1005,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 if t>20:
                     print("operation X exceed 21 retry, exiting")
                     logging.critical("operation X exceed 21 retry, exiting")
-                    raise Exception
+                    raise MaxRetriesExceeded
                 netConf=NetConf(IpHost, UserName, PassWord)
                 print(f"Step 2.1.2: Reboot RE {master_slot}: ... Waiting")
                 result_show=apply_command(netConf,'request vmhost reboot',"1.3",hostNamDev)
@@ -956,6 +1014,9 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 if result_show:
                     result_write_file+=result_show
                     break
+            except MaxRetriesExceeded as err:
+                print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+                raise
             except exception.ConnectError as err:
                     t+=1
                     print('Error connect to {}, {}'.format(IpHost,err))
@@ -972,7 +1033,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 if t>20:
                     print("operation X exceed 20 retry, exiting")
                     logging.critical("operation X exceed 20 retry, exiting")
-                    raise Exception
+                    raise MaxRetriesExceeded
                 print("Step 2.1.3: Connecting to device after reboot RE")
                 netConf = NetConf(IpHost, UserName, PassWord)
                 print("Step 2.1.3: Getting routing engine master slot")
@@ -981,6 +1042,9 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 if master_slot_current.isdigit() and int(master_slot_current)!=int(master_slot):
                     print(f"Step 2.1: Reboot RE: ... Done")
                     break
+            except MaxRetriesExceeded as err:
+                print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+                raise
             except exception.ConnectError as err:
                 print("Step 2.1.3: Cannot connect to device after reboot. Retry in 20s")
                 t+=1
@@ -1003,7 +1067,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 if t>20:
                     print("operation X exceed 20 retry, exiting")
                     logging.critical("operation X exceed 20 retry, exiting")
-                    raise Exception
+                    raise MaxRetriesExceeded
                 netConf = NetConf(IpHost, UserName, PassWord)
                 cb_state = get_state_cb_sfb(netConf, type=chassis_detail['type'], slot=chassis_detail['slot'])
                 if cb_state == "Offline":
@@ -1015,6 +1079,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 elif cb_state=="Online":
                     print(f"Step 3.1: {chassis_detail['type']} {chassis_detail['slot']} status is {cb_state}")
                     netConf.close()
+                    time.sleep(10)
                     break
                 else:
                     print(f"Step 3.1.2: Waiting {chassis_detail['type']} {chassis_detail['slot']} online")
@@ -1023,18 +1088,21 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                     print(f"Step 3.1.2: {chassis_detail['type']} {chassis_detail['slot']} status is {cb_state}")
                     print("Step 3.1.2: Waiting 30s...Waiting")
                     time.sleep(30)
+            except MaxRetriesExceeded as err:
+                print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+                raise
             except exception.ConnectError as err:
                 t+=1
                 logging.exception(err)
                 print(err)
-                time.sleep(3)
+                time.sleep(30) ####default 3s
                 continue
             except Exception as err:
                 netConf.close()
                 t+=1
                 logging.exception(err)
                 print(err)
-                time.sleep(3)
+                time.sleep(30) ####default 3s
         t=1
         print(f"Step 3.2: Reboot {chassis_detail['type']} {chassis_detail['slot']}")
         while t<=21:
@@ -1042,7 +1110,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 if t>20:
                     print("operation X exceed 20 retry, exiting")
                     logging.critical("operation X exceed 20 retry, exiting")
-                    raise Exception
+                    raise MaxRetriesExceeded
                 print(f"Step 3.2.1: check {chassis_detail['type']} {chassis_detail['slot']} state")
                 netConf = NetConf(IpHost, UserName, PassWord)
                 cb_state = get_state_cb_sfb(netConf,type=chassis_detail['type'], slot=chassis_detail['slot'])
@@ -1050,12 +1118,13 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                     print(f"Step 3.2.1: {chassis_detail['type']} {chassis_detail['slot']} status is "+cb_state)
                     result_show= RebootCB_SFB(netConf,chassis_detail['type'],chassis_detail['slot'],hostNamDev,"1.3")
                     netConf.close()
-                    time.sleep(5)
+                    time.sleep(60)
                     continue
                 elif cb_state == "Offline":
                     print(f"Step 3.2.1: {chassis_detail['type']} {chassis_detail['slot']} status is "+cb_state)
                     result_write_file+=result_show
                     netConf.close()
+                    time.sleep(10)
                     break
                 else:
                     t+=1
@@ -1063,6 +1132,9 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                     print(f"Step 3.2.1: {chassis_detail['type']} {chassis_detail['slot']} status is "+cb_state)
                     print("Step 3.2.1: Waiting 30s...Waiting")
                     time.sleep(30)
+            except MaxRetriesExceeded as err:
+                print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+                raise
             except exception.ConnectError as err:
                 t+=1
                 logging.exception(err)
@@ -1082,13 +1154,16 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 if t>5:
                     print("operation X exceed 5 retry, exiting")
                     logging.critical("operation X exceed 5 retry, exiting")
-                    raise Exception
+                    raise MaxRetriesExceeded
                 netConf = NetConf(IpHost, UserName, PassWord)
                 result_show= apply_command(netConf,f"show chassis environment {chassis_detail['type']} {chassis_detail['slot']}","3.3",hostNamDev)
                 netConf.close()
                 if result_show:
                     result_write_file+=result_show
                     break
+            except MaxRetriesExceeded as err:
+                print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+                raise
             except exception.ConnectError as err:
                 t+=1
                 logging.exception(err)
@@ -1107,7 +1182,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 if t>20:
                     print("operation X exceed 20 retry, exiting")
                     logging.critical("operation X exceed 20 retry, exiting")
-                    raise Exception
+                    raise MaxRetriesExceeded
                 netConf = NetConf(IpHost, UserName, PassWord)
                 cb_state = get_state_cb_sfb(netConf, type=chassis_detail['type'], slot=chassis_detail['slot'])
                 if cb_state == "Offline":
@@ -1120,6 +1195,7 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                     print(f"Step 3.4: {chassis_detail['type']} {chassis_detail['slot']} status is "+cb_state)
                     result_write_file+=result_show
                     netConf.close()
+                    time.sleep(30)
                     break
                 else:
                     t+=1
@@ -1127,6 +1203,9 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                     print(f"Step 3.4.1: {chassis_detail['type']} {chassis_detail['slot']} status is "+cb_state)
                     print("Step 3.4.1: Waiting 30s...Waiting")
                     time.sleep(30)
+            except MaxRetriesExceeded as err:
+                print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+                raise
             except exception.ConnectError as err:
                 t+=1
                 print(err)
@@ -1146,13 +1225,16 @@ def FirstStepChassis(hostname, pre_file_name, IpHost, UserName, PassWord, conn_d
                 if t>5:
                     print("operation X exceed 5 retry, exiting")
                     logging.critical("operation X exceed 5 retry, exiting")
-                    raise Exception
+                    raise MaxRetriesExceeded
                 netConf = NetConf(IpHost, UserName, PassWord)
                 result_show= apply_command(netConf,f"show chassis environment {chassis_detail['type']} {chassis_detail['slot']}","3.5",hostNamDev)
                 netConf.close()
                 if result_show:
                     result_write_file+=result_show
                     break
+            except MaxRetriesExceeded as err:
+                print(f"CRITICAL ERROR: Caught MaxRetriesExceeded at t={t}: {err}. Stopping execution.")
+                raise
             except exception.ConnectError as err:
                 t+=1
                 print(err)

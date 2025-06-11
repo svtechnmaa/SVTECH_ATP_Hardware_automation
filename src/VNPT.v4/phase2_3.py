@@ -96,7 +96,7 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd):
                     output={'Output-1':lines[:line_index[5]], 'Output-2':lines[line_index[5]:line_index[8]], 'Output-3':lines[line_index[8]:line_index[10]], 'Output-4':lines[line_index[10]:line_index[12]], 'Output-5':lines[line_index[12]:line_index[13]], 'Output-7':lines[line_index[13]:]}
                 for line in output['Output-1']:
                     run = table.cell(0,0).add_paragraph().add_run(line.strip("\n"))
-                    run.font.size  = Pt(9)
+                    run.font.size  = Pt(7)
                     run.font.name = 'Courier New'
                     if "@" in line and '>' in line:
                         run.font.bold = True
@@ -106,7 +106,7 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd):
                         table2.cell(0,0).paragraphs[0].text=""
                         for line in data:
                             run = table2.cell(0,0).add_paragraph().add_run(line.strip("\n"))
-                            run.font.size  = Pt(9)
+                            run.font.size  = Pt(7)
                             run.font.name = 'Courier New'
                             if "@" in line and '>' in line:
                                 run.font.bold = True
@@ -162,12 +162,12 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd):
                 for line in output_1:
                     if "@" in line and '>' in line:
                         run = table.cell(0,0).add_paragraph().add_run(line.strip("\n"))
-                        run.font.size  = Pt(9)
+                        run.font.size  = Pt(7)
                         run.font.name = 'Courier New'
                         run.font.bold = True
                     else:
                         run = table.cell(0,0).add_paragraph().add_run(line.strip("\n"))
-                        run.font.size  = Pt(9)
+                        run.font.size  = Pt(7)
                         run.font.name = 'Courier New'
                 for table2 in tables:
                     if ('510-2024' not in hd and '117-2025' not in hd and "Output-2-"+host in table2.cell(0,0).paragraphs[0].text) or (('510-2024' in hd or '117-2025' in hd) and "Output-8-"+host in table2.cell(0,0).paragraphs[0].text):
@@ -188,12 +188,12 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd):
                             for line in output_2:
                                 if "@" in line and '>' in line:
                                     run = table2.cell(0,0).add_paragraph().add_run(line.strip("\n"))
-                                    run.font.size  = Pt(9)
+                                    run.font.size  = Pt(7)
                                     run.font.name = 'Courier New'
                                     run.font.bold = True
                                 else:
                                     run = table2.cell(0,0).add_paragraph().add_run(line.strip("\n"))
-                                    run.font.size  = Pt(9)
+                                    run.font.size  = Pt(7)
                                     run.font.name = 'Courier New'
         if all('Module' in t for t in list_log_file):
             tmp=1

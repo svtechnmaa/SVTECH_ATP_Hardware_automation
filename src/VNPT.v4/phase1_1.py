@@ -161,7 +161,7 @@ def parse_BBBG(folder_hd):
                 logging.exception('No column Serial Number/Part #/ĐVT/Mô tả hàng hóa in table Danh mục hàng hóa bàn giao in bbbg {}, list header is {}'.format(tail, table_header))
                 print('No column Serial Number/Part #/ĐVT/Mô tả hàng hóa in table Danh mục hàng hóa bàn giao in bbbg {}'.format(tail))
                 raise Exception
-            throughput=0
+            throughput=None
             for row in wordDoc.tables[SN_table_index].rows:
                 exception_element=["N/A", "", "Serial Number"]
                 module=['XFP','QSFP','QDD','SFP']
@@ -169,7 +169,7 @@ def parse_BBBG(folder_hd):
                 if 'Linecard' in row.cells[table_header['mô tả hàng hóa']].text:
                     throughput= re.search("Linecard (.*)",row.cells[table_header['mô tả hàng hóa']].text, re.I).group(1)
                 if all(row.cells[table_header['serial number']].text!=i for i in exception_element): #serial number not N/A or header
-                    if row.cells[table_header['part #']].text[0:3]=='MPC':
+                    if row.cells[table_header['part #']].text.startswith('MPC'):
                         SN=row.cells[table_header['serial number']].text
                         list_SN=check_vietnamese(SN)
                         dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['fpc'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text,'Throughput':throughput})
@@ -177,15 +177,15 @@ def parse_BBBG(folder_hd):
                         SN=row.cells[table_header['serial number']].text
                         list_SN=check_vietnamese(SN)
                         dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['lca'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text})
-                    elif row.cells[table_header['part #']].text[0:3]=='MIC':
+                    elif row.cells[table_header['part #']].text.startswith('MIC'):
                         SN=row.cells[table_header['serial number']].text
                         list_SN=check_vietnamese(SN)
-                        dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['mic'].append({'listSN':list_SN})
-                    elif row.cells[table_header['part #']].text[0:3]=='PIC':
+                        dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['mic'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text})
+                    elif row.cells[table_header['part #']].text.startswith('PIC'):
                         SN=row.cells[table_header['serial number']].text
                         list_SN=check_vietnamese(SN)
-                        dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['pic'].append({'listSN':list_SN})
-                    elif row.cells[table_header['part #']].text[0:5]=='MX960':
+                        dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['pic'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text})
+                    elif row.cells[table_header['part #']].text.startswith('MX960') or row.cells[table_header['part #']].text.startswith('MX2020'):
                         SN=row.cells[table_header['serial number']].text
                         list_SN=check_vietnamese(SN)
                         dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['chassis'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text})
@@ -415,6 +415,7 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
     listSN=pd.read_sql_query("SELECT SN, BBBG, PartNumber, Throughput, Type FROM 'checkSN' where ma_HD=(?)" , conn, params=(hd,))
     listSN['fpc_type_variable'] = listSN.apply(lambda row:
         "<serial_number_here_MX960>" if re.match(r"MX960(.*)", row['PartNumber']) else
+        "<serial_number_here_MX2020>" if re.match(r"MX2020(.*)", row['PartNumber']) else
         '<serial_number_here' +
         ('_' + re.search("MPC(.*?)-", row['PartNumber']).group(1) if re.search("MPC(.*?)-", row['PartNumber']) else '') +
         ('_' + row['Throughput'] if pd.notna(row['Throughput']) else '') +
