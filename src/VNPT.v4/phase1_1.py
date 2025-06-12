@@ -177,23 +177,23 @@ def parse_BBBG(folder_hd):
                     elif row.cells[table_header['part #']].text=='MX2000-LC-ADAPTER':
                         SN=row.cells[table_header['serial number']].text
                         list_SN=check_vietnamese(SN)
-                        dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['lca'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text})
+                        dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['lca'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text,'Throughput':None})
                     elif row.cells[table_header['part #']].text.startswith('MIC'):
                         SN=row.cells[table_header['serial number']].text
                         list_SN=check_vietnamese(SN)
-                        dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['mic'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text})
+                        dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['mic'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text,'Throughput':None})
                     elif row.cells[table_header['part #']].text.startswith('PIC'):
                         SN=row.cells[table_header['serial number']].text
                         list_SN=check_vietnamese(SN)
-                        dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['pic'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text})
+                        dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['pic'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text,'Throughput':None})
                     elif row.cells[table_header['part #']].text.startswith('MX960') or row.cells[table_header['part #']].text.startswith('MX2020'):
                         SN=row.cells[table_header['serial number']].text
                         list_SN=check_vietnamese(SN)
-                        dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['chassis'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text})
+                        dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['chassis'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text,'Throughput':None})
                     elif any(i in row.cells[table_header['part #']].text for i in module):
                         SN = row.cells[table_header['serial number']].text
                         list_SN=check_vietnamese(SN)
-                        dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['module'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text})
+                        dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['module'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text,'Throughput':None})
                 #update add data list device (in bbbg)
                 # if row.cells[table_header['Serial Number']].text!='Serial Number' and (row.cells[table_header['ĐVT']].text.lower()=='card' or row.cells[table_header['ĐVT']].text.lower()=='module'):
                 #     dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['device'].append(row.cells[table_header['Part #']].text)
