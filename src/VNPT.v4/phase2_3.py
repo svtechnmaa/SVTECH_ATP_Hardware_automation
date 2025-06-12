@@ -141,13 +141,13 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd):
                     elif 'Module' in log:
                         # If only have module in host, get only 1 command show chassis hardware
                         if not any('FPC' in t for t in matching):
-                            if '510-2024' in hd or '117-2025' in hd:
+                            if '510-2024' in hd or '126-2025' in hd:
                                 dict_output_module[fname.stat().st_mtime]=lines[(line_index[0]-1):(line_index[2]-1)]
                             else:
                                 dict_output_module[fname.stat().st_mtime]=lines[(line_index[0]-1):(line_index[1]-1)]
                             dict_output_module=dict(sorted(dict_output_module.items()))
                             str_output_module=dict_output_module[list(dict_output_module.keys())[-1]]
-                        if '510-2024' in hd:
+                        if '510-2024' in hd or '126-2025' in hd:
                             output_1+=lines[(line_index[2]-1):]
                         else:
                             output_1+=lines[(line_index[1]-1):]

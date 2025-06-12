@@ -454,7 +454,7 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
             for item in all_paragraph:
                 if "Kết quả test" in item.text:
                     tmp+=1
-                    if '510-2024' in hd and (tmp<6 or tmp==7) and listSN.loc[(listSN['BBBG'] == unique_bbbg['tail'])&(listSN['Type']=='chassis')].empty:
+                    if ('510-2024' in hd or '117-2025' in hd) and (tmp<6 or tmp==7) and listSN.loc[(listSN['BBBG'] == unique_bbbg['tail'])&(listSN['Type']=='chassis')].empty:
                         new_table=atp_file.add_table(rows=1, cols=1)
                         set_cell_border( cell = new_table.rows[0].cells[0], **cell_border_style)
                         heading_row = new_table.rows[0].cells
