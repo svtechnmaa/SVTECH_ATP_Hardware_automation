@@ -139,6 +139,7 @@ def parse_BBBG(folder_hd):
         list_file=convert_doc_to_docx(net)
         net=net.split('/')[-2]
         for file in list_file:
+            print(f'Parsing bbbg {file}')
             head, tail=os.path.split(file)
             tail=re.search("(.+).docx",tail).group(1)
             file_copy=copy.deepcopy(file)
@@ -391,6 +392,8 @@ def set_cell_text(tables, list_keyword, new_data):
                             for paragraph in cell.paragraphs:
                                 paragraph.runs[0].font.size = font_size
                                 paragraph.runs[0].font.name = font_name
+                                if i in ['host_name', 'name_tram']:
+                                    paragraph.runs[0].bold=True
                                 paragraph.paragraph_format.left_indent = Pt(0)
                                 paragraph.paragraph_format.space_before = Pt(0)
                                 paragraph.paragraph_format.space_after = Pt(0)
@@ -399,7 +402,7 @@ def set_cell_text(tables, list_keyword, new_data):
 def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
     print("Generating atp template")
     if template.endswith('.doc'):
-        subprocess.call(['libreoffice','--headless','--convert-to','docx', f'{template}'])
+        subprocess.call(['libreoffice','--headless','--convert-to','docx',"--outdir", os.path.dirname(template), f'{template}'])
         template=template.replace('.doc','.docx')
     database=os.path.join(output_dir,db_name)
     conn = sqlite3.connect(database)
