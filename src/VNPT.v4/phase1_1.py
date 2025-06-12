@@ -222,14 +222,15 @@ def validate_bbbg(bbbg):
 def parse_mapping(ip_file, mapping_file, output_dir, mapping_sheet="Sheet1", ip_sheet="Sheet1"):
     print("Parsing ip and mapping file")
     dict_ip_error={}
-    if 'xlsx' in os.path.splitext(ip_file)[1].lower():
-        df=pd.read_excel(open(ip_file, 'rb'), sheet_name=ip_sheet,usecols=['IP Loopback', 'Hostname'])
-    else:
+    if 'csv' in os.path.splitext(ip_file)[1].lower():
         df=pd.read_csv(ip_file, usecols=['IP Loopback', 'Hostname'])
-    if 'xlsx' in os.path.splitext(mapping_file)[1].lower():
-        df_mapping=pd.read_excel(open(mapping_file, 'rb'), sheet_name=mapping_sheet,usecols=['Hostname', 'BBBG'])
     else:
+        df=pd.read_excel(open(ip_file, 'rb'), sheet_name=ip_sheet,usecols=['IP Loopback', 'Hostname'])
+
+    if 'csv' in os.path.splitext(mapping_file)[1].lower():
         df_mapping=pd.read_csv(mapping_file, usecols=['Hostname', 'BBBG'])
+    else:
+        df_mapping=pd.read_excel(open(mapping_file, 'rb'), sheet_name=mapping_sheet,usecols=['Hostname', 'BBBG'])
     # Validate data input - Start
     df['Hostname'] = df['Hostname'].apply(validate_hostname)
     df_mapping['Hostname'] = df_mapping['Hostname'].apply(validate_hostname)
@@ -261,7 +262,7 @@ def add_random_minute_and_second(obj):
     return obj.replace(hour=0, minute=random_minute, second=random_second)
 
 def parse_signning(signning_file, signning_sheet='Sheet1', header_index=0):
-    cols=['Tên trạm trên HS/BB', 'VNPT Net X', 'Người kí INOC trang 1', 'Người kí Netx trang 1', 'Người ký SVT trang 1', 'Người kí INOC chi tiết', 'Người ký SVT chi tiết', 'Ngày kết thúc', 'Thời gian ký']
+    cols=['Tên trạm trên HS/BB', 'VNPT Net X', 'Người ký INOC trang 1', 'Người ký Netx trang 1', 'Người ký SVT trang 1', 'Người ký INOC chi tiết', 'Người ký SVT chi tiết', 'Ngày kết thúc', 'Thời gian ký']
     if signning_file:
         if 'xlsx' in os.path.splitext(signning_file)[1].lower():
             df=pd.read_excel(open(signning_file, 'rb'), sheet_name=signning_sheet, header=header_index, usecols=cols)
@@ -411,7 +412,7 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
                             "end": {"sz": 8, "val": "single"},
                             }
     bbbg=pd.read_sql_query("SELECT * FROM 'BBBG' where ma_HD=(?)" , conn,params=(hd,))
-    unique_bbbg_hd=bbbg[['tail', 'net', 'ma_HD','name_tram', 'Người kí INOC trang 1', 'Người kí Netx trang 1', 'Người ký SVT trang 1', 'Người kí INOC chi tiết', 'Người ký SVT chi tiết']].copy().drop_duplicates()
+    unique_bbbg_hd=bbbg[['tail', 'net', 'ma_HD','name_tram', 'Người ký INOC trang 1', 'Người ký Netx trang 1', 'Người ký SVT trang 1', 'Người ký INOC chi tiết', 'Người ký SVT chi tiết']].copy().drop_duplicates()
     listSN=pd.read_sql_query("SELECT SN, BBBG, PartNumber, Throughput, Type FROM 'checkSN' where ma_HD=(?)" , conn, params=(hd,))
     listSN['fpc_type_variable'] = listSN.apply(lambda row:
         "<serial_number_here_MX960>" if re.match(r"MX960(.*)", row['PartNumber']) else
@@ -432,7 +433,7 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
         unique_bbbg['host_name']=', '.join(listSN.loc[listSN['BBBG'] == unique_bbbg['tail']]['PartNumber'].unique())
         atp_file = copy.deepcopy(docx.Document(template))
         try:
-            set_cell_text(tables=atp_file.tables,list_keyword=['host_name','name_tram', 'Người kí INOC trang 1', 'Người kí Netx trang 1', 'Người ký SVT trang 1', 'Người kí INOC chi tiết', 'Người ký SVT chi tiết'], new_data=unique_bbbg)
+            set_cell_text(tables=atp_file.tables,list_keyword=['host_name','name_tram', 'Người ký INOC trang 1', 'Người ký Netx trang 1', 'Người ký SVT trang 1', 'Người ký INOC chi tiết', 'Người ký SVT chi tiết'], new_data=unique_bbbg)
             for table in atp_file.tables:
                 if table.cell(0,0).paragraphs[0].text == '1_output_here' or table.cell(0,0).paragraphs[0].text == '2_output_here':
                     table._element.getparent().remove(table._element)
