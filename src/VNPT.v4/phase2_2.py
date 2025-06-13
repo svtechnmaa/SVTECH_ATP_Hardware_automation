@@ -64,14 +64,17 @@ def compare_db_and_pyez(planning_data, real_data, slot):
 def apply_command(netConf, command,step,HostName):
     if '| match' in command:
         based_command, filter = command.split('| match ')
-        out_put = netConf.cli(based_command, warning= False)
+        if '| no-more' in filter:
+            filter = filter.split('| no-more')[0].strip().strip('"')
+        elif '| no-more' in based_command:
+            based_command = based_command.split('| no-more')[0]
+        out_put = netConf.cli(based_command.strip(), warning= False)
         out_put="\n".join(line for line in out_put.splitlines() if filter in line)+'\n'
-        command=f'{based_command}| match "{filter}"'
     else:
         out_put = netConf.cli(command, warning= False)
     time.sleep(5)
-    output=HostName+command+'\r'+out_put+'\r'
     # output=HostName+command+'\r'+str(pd.to_datetime(datetime.now()).strftime('%b %d %H:%M:%S'))+'\r'
+    output=HostName+command+'\r'+out_put+'\r'
     print("Step "+ step+": Run command: "+command +"...OK")
     return output
 
@@ -145,83 +148,6 @@ def update_db(conn_db, hostname, SN, status, hd):
     conn_db.commit()
     print("Record Updated successfully")
     cursor.close()
-
-def replace_starttime(multi_line_text, sub_pattern, replacement):
-    """
-    Processes a multi-line text, replacing the date and setting the hour to 00
-    (while retaining minutes and seconds) for every line that matches the pattern.
-
-    Args:
-        multi_line_text (str): The input text containing multiple lines.
-                               Lines like: "Start time  2024-02-02 08:05:18 ICT" will be processed.
-        new_date_str (str): The new date in 'YYYY-MM-DD' format.
-                            Example: "2025-06-05"
-
-    Returns:
-        str: The modified multi-line text. Lines not matching the pattern are unchanged.
-    """
-    extract_pattern_modified = r".*?(\d{4}-\d{2}-\d{2}\s+00:\d{2}:\d{2})\s+.*"
-    lines = multi_line_text.splitlines()
-    modified_lines = []
-    extracted_modified_datetimes = ''
-    for line in lines:
-        modified_line = re.sub(sub_pattern, replacement, line)
-        modified_lines.append(modified_line)
-        if modified_line != line:
-            match = re.search(extract_pattern_modified, modified_line)
-            if match:
-                modified_datetime_string = match.group(1)
-                extracted_modified_datetimes = datetime.strptime(modified_datetime_string, "%Y-%m-%d %H:%M:%S")
-    return "\n".join(modified_lines)+'\n', extracted_modified_datetimes
-
-def replace_uptime(multi_line_text, end_datetime, start_datetime):
-    """
-    Replaces the duration part in 'Uptime' lines within a multi-line text
-    with the calculated difference between two datetime objects.
-
-    Args:
-        multi_line_text (str): The input multi-line string.
-        end_datetime (datetime): The ending datetime.
-        start_datetime (datetime): The starting datetime.
-
-    Returns:
-        str: The modified multi-line text.
-    """
-    total_diff_seconds = int((end_datetime - start_datetime).total_seconds())
-    if total_diff_seconds < 0:
-        total_diff_seconds = 0
-    years = total_diff_seconds // (365 * 24 * 3600)
-    remaining_seconds = total_diff_seconds % (365 * 24 * 3600)
-    months = remaining_seconds // (30 * 24 * 3600)
-    remaining_seconds %= (30 * 24 * 3600)
-    days = remaining_seconds // (24 * 3600)
-    remaining_seconds %= (24 * 3600)
-    hours = remaining_seconds // 3600
-    remaining_seconds %= 3600
-    minutes = remaining_seconds // 60
-    seconds = remaining_seconds % 60
-    duration_parts = []
-    if years > 0:
-        duration_parts.append(f"{years} year{'s' if years != 1 else ''}")
-    if months > 0:
-        duration_parts.append(f"{months} month{'s' if months != 1 else ''}")
-    if days > 0:
-        duration_parts.append(f"{days} day{'s' if days != 1 else ''}")
-    if hours > 0:
-        duration_parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
-    if minutes > 0:
-        duration_parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
-    if seconds > 0 or not duration_parts:
-        duration_parts.append(f"{seconds} second{'s' if seconds != 1 else ''}")
-    formatted_duration = ", ".join(duration_parts)
-    pattern = r"^(Uptime\s+).*$"
-    replacement = rf"\g<1>{formatted_duration}"
-    modified_lines = []
-    lines = multi_line_text.splitlines()
-    for line in lines:
-        modified_line = re.sub(pattern, replacement, line)
-        modified_lines.append(modified_line)
-    return "\n".join(modified_lines)+'\n'
 
 def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, slot, hd, request_reboot,hostNamDev,log_dir):
     list_commands_on_hd={
@@ -386,20 +312,10 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             netConf = NetConf(IpHost, UserName, PassWord)
             result_show=""
             print("Step 1.2: raw log: ... Waiting")
-            edited_starttime=None
             for command in hd_commands['before_reboot']:
                 if '{fpc_slot}' in command:
                     command=command.format(fpc_slot=fpc_slot)
-                if command==f"show chassis fpc {fpc_slot} detail" and not pd.isna(planning_time['Ngày kết thúc']) and not pd.isna(planning_time['Thời gian ký']):
-                    output=apply_command(netConf, command, "1.2",hostNamDev)
-                    output_replace, edited_starttime = replace_starttime(output, r"^(.*?)(\s+)\d{4}-\d{2}-\d{2}\s+\d{2}:(\d{2}):(\d{2})(\s+.*)$", rf"\g<1>\g<2>{planning_time['Ngày kết thúc'].strftime('%Y-%m-%d')} 00:\g<3>:\g<4>\g<5>")
-                    output_replace=replace_uptime(output_replace, planning_time['Thời gian ký'], edited_starttime)
-                    result_show+=output_replace
-                elif re.search(r'show chassis pic fpc-slot {} pic-slot [01]'.format(fpc_slot), command) and not pd.isna(planning_time['Ngày kết thúc']) and not pd.isna(planning_time['Thời gian ký']):
-                    output=apply_command(netConf, command, "1.2",hostNamDev)
-                    output_replace=replace_uptime(output, planning_time['Thời gian ký'], edited_starttime + timedelta(minutes=random.randint(5, 10)))
-                    result_show+=output_replace
-                elif 'diagnostics' in command:
+                if 'diagnostics' in command:
                     list_interface=get_module_in_fpc(netConf,fpc_slot)
                     for i in list_interface:
                         result_show+=apply_command(netConf,command.format(interface=i),"1.2",hostNamDev)
@@ -633,12 +549,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 for command in hd_commands['after_reboot']:
                     if '{fpc_slot}' in command:
                         command=command.format(fpc_slot=fpc_slot)
-                    if command==f"show chassis fpc {fpc_slot} detail" and not pd.isna(planning_time['Ngày kết thúc']) and not pd.isna(planning_time['Thời gian ký']):
-                        output=apply_command(netConf, command, "1.3",hostNamDev)
-                        output_replace, new_starttime = replace_starttime(output, r"^(.*?)(\s+)\d{4}-\d{2}-\d{2}\s+\d{2}:(\d{2}):(\d{2})(\s+.*)$", rf"\g<1>\g<2>{planning_time['Thời gian ký'].strftime('%Y-%m-%d %H:%M:%S')}\g<5>")
-                        result_show+=output_replace
-                    else:
-                        result_show+=apply_command(netConf,command,"1.3",hostNamDev)
+                    result_show+=apply_command(netConf,command,"1.3",hostNamDev)
                 netConf.close()
                 if result_show!='':
                     result_write_file+=result_show
