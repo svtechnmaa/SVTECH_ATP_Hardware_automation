@@ -152,10 +152,12 @@ def run_phase2_2(hopdong, hostname, hostslot, username, password, request_reboot
         return 0
 
 @ex.command
-def run_phase2_3(hopdong, list_bbbg, output_dir):
+def run_phase2_3(hopdong, list_bbbg, output_dir, database_name):
     try:
+        bbbg_on_db = get_list_time_bbbg(database=os.path.join(output_dir, database_name), list_bbbg=list_bbbg, hd=hopdong)
         for bbbg in list_bbbg:
-            phase2_3.export_atp(bbbg,hopdong,output_dir)
+            bbbg_info=bbbg_on_db[bbbg_on_db['tail'] == bbbg].iloc[0]
+            phase2_3.export_atp(bbbg,hopdong,output_dir, bbbg_info['Ngày kết thúc'], bbbg_info['Thời gian ký'])
         return 1
     except Exception as e:
         print("[run_phase2_3] Error occurred during execution::: {}".format(e))
@@ -280,6 +282,7 @@ if ('running' in st.session_state and st.session_state.running) or 'run_id' in s
                     ex.observers = [sql_observer]
                     config_updates={
                         "output_dir": conf['OUTPUT_DIR'],
+                        "database_name": conf['DB_NAME'],
                         "list_bbbg": st.session_state['input_data_phase_2.3']['list_bbbg'],
                         "hopdong": st.session_state['input_data_phase_2.3']['hopdong'],
                     }

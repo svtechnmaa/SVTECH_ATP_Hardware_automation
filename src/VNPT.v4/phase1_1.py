@@ -30,7 +30,7 @@ def check_vietnamese(sn):
     list_tmp=sn.splitlines()
     list_SN=[]
     for i in list_tmp:
-        if len(re.findall(r"\b\S*[ăâáắấàằầảẳẩãẵẫạặậđêéếèềẻểẽễẹệíìỉĩịôơóốớòồờỏổởõỗỡọộợưúứùừủửũữụựýỳỷỹỵ]+\S*\b", i.lower()))==0:
+        if len(re.findall(r"\b\S*[ăâáắấàằầảẳẩãẵẫạặậđêéếèềẻểẽễẹệíìỉĩịôơóốớòồờỏổởõỗỡọộợưúứùừủửũữụựýỳỷỹỵ]+\S*\b", i.lower()))==0 and i.strip():
             list_SN.append(i)
     return list_SN
 
@@ -139,7 +139,7 @@ def parse_BBBG(folder_hd):
         list_file=convert_doc_to_docx(net)
         net=net.split('/')[-2]
         for file in list_file:
-            print(f'Parsing bbbg {file}')
+            print(f'Parsing bbbg {os.path.basename(file)}')
             head, tail=os.path.split(file)
             tail=re.search("(.+).docx",tail).group(1)
             file_copy=copy.deepcopy(file)

@@ -301,3 +301,10 @@ def get_a_run(database, id):
     conn = sqlite3.connect(database)
     df=pd.read_sql_query("SELECT * FROM 'run' where run_id=(?)" , conn, params=(id,))
     return df.iloc[0]
+
+def get_list_time_bbbg(database, list_bbbg, hd):
+    conn = sqlite3.connect(database)
+    placeholders = ','.join('?' * len(list_bbbg))
+    query = f"SELECT `tail`, `Ngày kết thúc`, `Thời gian ký` FROM 'BBBG' WHERE tail IN ({placeholders}) AND ma_HD = ?"
+    bbbg_on_db = pd.read_sql_query(query, conn, params=list_bbbg + [hd]).drop_duplicates()
+    return bbbg_on_db
