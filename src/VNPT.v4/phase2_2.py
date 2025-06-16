@@ -96,7 +96,7 @@ def check_fpc_status(netConf,fpc_slot,step,HostName):
 
 def get_module_in_fpc(netconf, slot):
     device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netconf,tableview_file=os.path.join(current_script_dir, '../hardwareTable.yml'),data_type='Module', include_hostname=False,output_format='dataframe')
-    if not device_hardware.empty:
+    if isinstance(device_hardware, pd.DataFrame) and not device_hardware.empty:
         tempData = device_hardware.loc[device_hardware['fpc_slot'] == 'FPC '+slot]
         if not tempData.empty:
             tempData["slot"] = tempData.apply(lambda x: str(re.search("Xcvr (\d+)",x['hardware_name']).group(1)), axis=1)
@@ -312,16 +312,15 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             netConf = NetConf(IpHost, UserName, PassWord)
             result_show=""
             print("Step 1.2: raw log: ... Waiting")
+            list_interface=get_module_in_fpc(netConf,fpc_slot)
             for command in hd_commands['before_reboot']:
                 if '{fpc_slot}' in command:
                     command=command.format(fpc_slot=fpc_slot)
-                if 'diagnostics' in command:
-                    list_interface=get_module_in_fpc(netConf,fpc_slot)
+                if 'diagnostics' in command and list_interface:
                     for i in list_interface:
                         result_show+=apply_command(netConf,command.format(interface=i),"1.2",hostNamDev)
-                else:
+                elif ('terse media' in command and list_interface) or ('terse media' not in command and 'diagnostics' not in command):
                     result_show+=apply_command(netConf, command, "1.2",hostNamDev)
-
             print("Step 1.2: Done: ... Complete")
             netConf.close()
             if result_show!='':
@@ -549,7 +548,8 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 for command in hd_commands['after_reboot']:
                     if '{fpc_slot}' in command:
                         command=command.format(fpc_slot=fpc_slot)
-                    result_show+=apply_command(netConf,command,"1.3",hostNamDev)
+                    if ('terse media' in command and list_interface) or ('terse media' not in command):
+                        result_show+=apply_command(netConf,command,"1.3",hostNamDev)
                 netConf.close()
                 if result_show!='':
                     result_write_file+=result_show
