@@ -455,8 +455,9 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
                             cell.paragraphs[0].runs[0].font.name = 'Times New Roman'
                         if 'show system license' in cell.text and not has_fpc:
                             cell = row.cells[3]
-                            paragraph = cell.paragraphs[0] if cell.paragraphs else cell.add_paragraph()
-                            paragraph.text ='Không thực hiện mục này do phân bổ thành phần phần cứng tại trạm không có'
+                            for paragraph in cell.paragraphs:
+                                cell._element.remove(paragraph._element)
+                            paragraph = cell.add_paragraph('Không thực hiện mục này do phân bổ thành phần phần cứng tại trạm không có')
                             paragraph.runs[0].font.size = Pt(12)
                             paragraph.runs[0].font.name = 'Times New Roman'
                             paragraph.runs[0].alignment = docx.enum.text.WD_PARAGRAPH_ALIGNMENT.CENTER
