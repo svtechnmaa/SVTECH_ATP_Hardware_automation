@@ -263,6 +263,7 @@ def add_random_minute_and_second(obj):
     return obj.replace(hour=0, minute=random_minute, second=random_second)
 
 def parse_signning(signning_file, signning_sheet='Sheet1', header_index=0):
+    print('Parsing signing file')
     cols=['Tên trạm trên HS/BB', 'VNPT Net X', 'Người ký INOC trang 1', 'Người ký Netx trang 1', 'Người ký SVT trang 1', 'Người ký INOC chi tiết', 'Người ký SVT chi tiết', 'Ngày kết thúc', 'Thời gian ký']
     if signning_file:
         if 'xlsx' in os.path.splitext(signning_file)[1].lower():

@@ -86,7 +86,7 @@ def replace_uptime(single_line_text, end_datetime, start_datetime):
     if seconds > 0 or not duration_parts:
         duration_parts.append(f"{seconds} second{'s' if seconds != 1 else ''}")
     formatted_duration = ", ".join(duration_parts)
-    pattern = r"^(Uptime\s+).*$"
+    pattern = r"^(\s*Uptime\s+).*$"
     replacement = rf"\g<1>{formatted_duration}"
     modified_line = re.sub(pattern, replacement, single_line_text)
     return modified_line + '\n'
@@ -208,16 +208,16 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd, end_date, sign_tim
                         if end_date and sign_time:
                             for i, e in enumerate(lines[:(line_index[-2]-1)]):
                                 if re.search(r'show chassis fpc \d+ detail', e):
-                                    if edited_starttime:
-                                        lines[j], _= replace_starttime(lines[j], r"^(.*?)(\s+)\d{4}-\d{2}-\d{2}\s+\d{2}:(\d{2}):(\d{2})(\s+.*)$", rf"\g<1>\g<2>{sign_time.strftime('%Y-%m-%d %H:%M:%S')}\g<5>")
-                                        break
-                                    else:
-                                        for j in range(i + 1, (line_index[-2]-1)):
-                                            if 'Start time' in lines[j]:
-                                                lines[j], edited_starttime = replace_starttime(lines[j], r"^(.*?)(\s+)\d{4}-\d{2}-\d{2}\s+\d{2}:(\d{2}):(\d{2})(\s+.*)$", rf"\g<1>\g<2>{end_date.strftime('%Y-%m-%d')} 00:\g<3>:\g<4>\g<5>")
-                                            elif 'Uptime' in lines[j]:
-                                                lines[j]=replace_uptime(lines[j], sign_time, edited_starttime)
+                                    for j in range(i + 1, (line_index[-2]-1)):
+                                        if 'Start time' in lines[j]:
+                                            if edited_starttime:
+                                                lines[j], _= replace_starttime(lines[j], r"^(.*?)(\s+)\d{4}-\d{2}-\d{2}\s+\d{2}:(\d{2}):(\d{2})(\s+.*)$", rf"\g<1>\g<2>{sign_time.strftime('%Y-%m-%d %H:%M:%S')}\g<5>")
                                                 break
+                                            else:
+                                                lines[j], edited_starttime = replace_starttime(lines[j], r"^(.*?)(\s+)\d{4}-\d{2}-\d{2}\s+\d{2}:(\d{2}):(\d{2})(\s+.*)$", rf"\g<1>\g<2>{end_date.strftime('%Y-%m-%d')} 00:\g<3>:\g<4>\g<5>")
+                                        elif 'Uptime' in lines[j]:
+                                            lines[j]=replace_uptime(lines[j], sign_time, edited_starttime)
+                                            break
                                 elif re.search(r'show chassis pic fpc-slot \d+ pic-slot [01]', e):
                                     for j in range(i + 1, (line_index[-2]-1)):
                                         if 'Uptime' in lines[j]:
@@ -342,6 +342,8 @@ def main():
     placeholders = ','.join('?' * len(args.bbbg))
     query = f"SELECT 'tail', 'Ngày kết thúc', 'Thời gian ký' FROM 'BBBG' WHERE tail IN ({placeholders}) AND ma_HD = ?"
     bbbg_on_db = pd.read_sql_query(query, conn, params=args.bbbg + [args.hopdong]).drop_duplicates()
+    bbbg_on_db['Ngày kết thúc'] = bbbg_on_db['Ngày kết thúc'].apply(pd.to_datetime)
+    bbbg_on_db['Thời gian ký'] = bbbg_on_db['Thời gian ký'].apply(pd.to_datetime)
     for bbbg in args.bbbg.split(','):
     #   =========== LOG INITIATION SEQUENCE
         dt = datetime.now()

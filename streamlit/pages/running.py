@@ -8,6 +8,7 @@ import threading
 import time
 from jnpr.junos import Device, exception
 import re
+import pandas as pd
 current_script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root_dir = os.path.abspath(os.path.join(current_script_dir, '..', '..'))
 utils_dir_path = os.path.join(project_root_dir, 'utils')
@@ -155,6 +156,8 @@ def run_phase2_2(hopdong, hostname, hostslot, username, password, request_reboot
 def run_phase2_3(hopdong, list_bbbg, output_dir, database_name):
     try:
         bbbg_on_db = get_list_time_bbbg(database=os.path.join(output_dir, database_name), list_bbbg=list_bbbg, hd=hopdong)
+        bbbg_on_db['Ngày kết thúc'] = bbbg_on_db['Ngày kết thúc'].apply(pd.to_datetime)
+        bbbg_on_db['Thời gian ký'] = bbbg_on_db['Thời gian ký'].apply(pd.to_datetime)
         for bbbg in list_bbbg:
             bbbg_info=bbbg_on_db[bbbg_on_db['tail'] == bbbg].iloc[0]
             phase2_3.export_atp(bbbg,hopdong,output_dir, bbbg_info['Ngày kết thúc'], bbbg_info['Thời gian ký'])
