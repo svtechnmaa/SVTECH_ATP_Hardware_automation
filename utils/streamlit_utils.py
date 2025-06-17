@@ -292,7 +292,7 @@ def get_list_run(database, phase):
         df['start_time'] = pd.to_datetime(df['start_time'])
         df['stop_time'] = pd.to_datetime(df['stop_time'])
         df['duration'] = df['stop_time'] - df['start_time']
-        df['run_time'] = df['start_time'].dt.strftime('%-m/%-d/%y %-I:%M %p').str.lower() +" in " +df['duration'].apply(format_duration)
+        df['run_time'] = df['start_time'].dt.tz_localize('UTC').dt.tz_convert('Asia/Bangkok').dt.strftime('%-m/%-d/%y %-I:%M %p').str.lower() +" in " +df['duration'].apply(format_duration)
         df = df.sort_values(by='start_time', ascending=False)  # Sort by start_time in descending order
         return df
     return pd.DataFrame()
