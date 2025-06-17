@@ -18,6 +18,7 @@ import sys
 import time
 from docx.table import _Cell
 import numpy as np
+from docx.shared import Inches
 import random
 current_script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root_dir = os.path.abspath(os.path.join(current_script_dir, '..', '..'))
@@ -434,6 +435,7 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
         list_host=bbbg.loc[(bbbg['tail'] == unique_bbbg['tail']) & (bbbg['ma_HD'] == unique_bbbg['ma_HD']) & (bbbg['net'] == unique_bbbg['net'])]['Hostname'].unique()
         unique_bbbg['host_name']=', '.join(listSN.loc[listSN['BBBG'] == unique_bbbg['tail']]['PartNumber'].unique())
         atp_file = copy.deepcopy(docx.Document(template))
+        has_fpc = any(type_val == 'fpc' for type_val in listSN.loc[listSN['BBBG'] == unique_bbbg['tail'], 'Type'].dropna())
         try:
             set_cell_text(tables=atp_file.tables,list_keyword=['host_name','name_tram', 'Người ký INOC trang 1', 'Người ký Netx trang 1', 'Người ký SVT trang 1', 'Người ký INOC chi tiết', 'Người ký SVT chi tiết'], new_data=unique_bbbg)
             for table in atp_file.tables:
@@ -451,7 +453,7 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
                                 cell.text=cell.text.replace(sn_var,sn)
                             cell.paragraphs[0].runs[0].font.size = Pt(12)
                             cell.paragraphs[0].runs[0].font.name = 'Times New Roman'
-                        if 'show system license' in cell.text and unique_bbbg['host_name']=='MX2000-LC-ADAPTER':
+                        if 'show system license' in cell.text and not has_fpc:
                             cell = row.cells[3]
                             paragraph = cell.paragraphs[0] if cell.paragraphs else cell.add_paragraph()
                             paragraph.text ='Không thực hiện mục này do phân bổ thành phần phần cứng tại trạm không có'
@@ -471,7 +473,7 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
                         run.font.name='Times New Roman'
                         run.font.size=Pt(12)
                         move_table_after(new_table, item)
-                    elif ((('510-2024' in hd or '117-2025' in hd) and tmp==8) or ('510-2024' not in hd and '117-2025' not in hd and tmp==2)) and unique_bbbg['host_name']=='MX2000-LC-ADAPTER':
+                    elif ((('510-2024' in hd or '117-2025' in hd) and tmp==8) or ('510-2024' not in hd and '117-2025' not in hd and tmp==2)) and not has_fpc:
                         item._element.getparent().remove(item._element)
                     else:
                         for host in list_host:
@@ -493,6 +495,9 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
                         print(f'No table DANH MỤC HÀNG HÓA BÀN GIAO TẠI TRẠM in BBBG {unique_bbbg["tail"]}')
                         continue
                     table_component=bbbg_file.tables[SN_table_index]
+                    table_component.autofit = False
+                    table_component.preferred_width = Inches(6.2)
+                    table_component.alignment = docx.enum.table.WD_TABLE_ALIGNMENT.CENTER
                     co_column=-1
                     csht_column=-1
                     for i, cell in enumerate(table_component.rows[0].cells):
@@ -507,7 +512,7 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
                         for cell_index in range(len(table_component.rows[row_index].cells)):
                             set_cell_border( cell = table_component.rows[row_index].cells[cell_index] , **cell_border_style)
                     set_table_font(table=table_component, font_name='Times New Roman', font_size=Pt(12))
-                    tbl_component=deepcopy(table_component.rows._tbl)
+                    tbl_component = deepcopy(table_component._tbl)
                     paragraph=item.insert_paragraph_before()
                     paragraph._p.addnext(tbl_component)
                     item.text=""

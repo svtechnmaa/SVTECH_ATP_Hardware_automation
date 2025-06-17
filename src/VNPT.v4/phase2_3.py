@@ -261,18 +261,18 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd, end_date, sign_tim
                 for table2 in tables:
                     if ('510-2024' not in hd and '117-2025' not in hd and "Output-2-"+host in table2.cell(0,0).paragraphs[0].text) or (('510-2024' in hd or '117-2025' in hd) and "Output-8-"+host in table2.cell(0,0).paragraphs[0].text):
                         #Delete table license result if only module in host
-                        if len(matching)>0 and all('Module' in t for t in matching):
-                            table2._element.getparent().remove(table2._element)
-                            all_paragraph = atp_file.paragraphs
-                            tmp=1
-                            for item in all_paragraph:
-                                if item.text==host:
-                                    if ('510-2024' not in hd and '117-2025' not in hd and tmp==2) or (('510-2024' in hd or '117-2025' in hd) and (tmp==8 if any("Chassis" in item for item  in list_log_file) else tmp==2)):
-                                        delete_paragraph(item)
-                                    else:
-                                        tmp+=1
+                        # if len(matching)>0 and all('Module' in t for t in matching):
+                        #     table2._element.getparent().remove(table2._element)
+                        #     all_paragraph = atp_file.paragraphs
+                        #     tmp=1
+                        #     for item in all_paragraph:
+                        #         if item.text==host:
+                        #             if ('510-2024' not in hd and '117-2025' not in hd and tmp==2) or (('510-2024' in hd or '117-2025' in hd) and (tmp==8 if any("Chassis" in item for item  in list_log_file) else tmp==2)):
+                        #                 delete_paragraph(item)
+                        #             else:
+                        #                 tmp+=1
                         #Parsing log license
-                        elif output_2!='':
+                        if output_2!='':
                             table2.cell(0,0).paragraphs[0].text=""
                             for line in output_2:
                                 if "@" in line and '>' in line:
@@ -284,35 +284,35 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd, end_date, sign_tim
                                     run = table2.cell(0,0).add_paragraph().add_run(line.strip("\n"))
                                     run.font.size  = Pt(7)
                                     run.font.name = 'Courier New'
-        if all('Module' in t for t in list_log_file):
-            tmp=1
-            for item in atp_file.paragraphs:
-                if 'Kết quả test' in item.text:
-                    if ('510-2024' not in hd and '117-2025' not in hd and tmp==2) or (('510-2024' in hd or '117-2025' in hd) and tmp==8):
-                        #Create empty table license result if bbbg only has module
-                        new_table=atp_file.add_table(rows=1, cols=1)
-                        cell_border_style =  {
-                        "top": {"sz": 8, "val": "single"},
-                        "bottom": {"sz": 8, "val": "single"},
-                        "start": {"sz": 8, "val": "single"},
-                        "end": {"sz": 8, "val": "single"},
-                        }
-                        set_cell_border( cell = new_table.rows[0].cells[0] ,
-                        **cell_border_style)
-                        #set_cell_background(new_table.rows[0].cells[0], '#d5e0f2')
-                        heading_row = new_table.rows[0].cells
-                        move_table_after(new_table, item)
-                    else:
-                        tmp+=1
-            for table in tables:
-                if len(table.rows) > 1 and re.match(r'Kiểm tra license của linecard(.*)bằng câu lệnh sau',table.cell(1,1).text):
-                    #Change text Ket qua in table step license
-                    table.cell(1,3).text='Không thực hiện mục này do phân bổ thành phần phần cứng tại trạm không có'
-                    table.cell(1,3).paragraphs[0].runs[0].font.size= Pt(12)
-                    table.cell(1,3).paragraphs[0].runs[0].font.name = 'Times New Roman'
-                    table.cell(1,3).paragraphs[0].alignment = 1 # for left, 1 for center, 2 right, 3 justify ....
-                if 'License name' in table.cell(0,0).text:
-                    table._element.getparent().remove(table._element)
+        # if all('Module' in t for t in list_log_file):
+        #     tmp=1
+        #     for item in atp_file.paragraphs:
+        #         if 'Kết quả test' in item.text:
+        #             if ('510-2024' not in hd and '117-2025' not in hd and tmp==2) or (('510-2024' in hd or '117-2025' in hd) and tmp==8):
+        #                 #Create empty table license result if bbbg only has module
+        #                 new_table=atp_file.add_table(rows=1, cols=1)
+        #                 cell_border_style =  {
+        #                 "top": {"sz": 8, "val": "single"},
+        #                 "bottom": {"sz": 8, "val": "single"},
+        #                 "start": {"sz": 8, "val": "single"},
+        #                 "end": {"sz": 8, "val": "single"},
+        #                 }
+        #                 set_cell_border( cell = new_table.rows[0].cells[0] ,
+        #                 **cell_border_style)
+        #                 #set_cell_background(new_table.rows[0].cells[0], '#d5e0f2')
+        #                 heading_row = new_table.rows[0].cells
+        #                 move_table_after(new_table, item)
+        #             else:
+        #                 tmp+=1
+        #     for table in tables:
+        #         if len(table.rows) > 1 and re.match(r'Kiểm tra license của linecard(.*)bằng câu lệnh sau',table.cell(1,1).text):
+        #             #Change text Ket qua in table step license
+        #             table.cell(1,3).text='Không thực hiện mục này do phân bổ thành phần phần cứng tại trạm không có'
+        #             table.cell(1,3).paragraphs[0].runs[0].font.size= Pt(12)
+        #             table.cell(1,3).paragraphs[0].runs[0].font.name = 'Times New Roman'
+        #             table.cell(1,3).paragraphs[0].alignment = 1 # for left, 1 for center, 2 right, 3 justify ....
+        #         if 'License name' in table.cell(0,0).text:
+        #             table._element.getparent().remove(table._element)
         atp_file.save(atp_file_path)
     except Exception as exp:
         logging.exception(exp)

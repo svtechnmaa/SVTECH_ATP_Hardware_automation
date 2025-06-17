@@ -52,8 +52,8 @@ def CheckSn(netConf,hw_type):
 
 def compare_db_and_pyez(planning_data, real_data, slot):
     print("Compare database with host")
-    planning_data["RealSlot"] = planning_data["RealSlot"].astype(float)
-    real_data["slot"] = real_data["slot"].astype(float)
+    planning_data["RealSlot"] = planning_data["RealSlot"].apply(lambda x: float(x) if isinstance(x, (int, float)) or str(x).replace('.','',1).isdigit() else str(x))
+    real_data["slot"] = real_data["slot"].apply(lambda x: float(x) if isinstance(x, (int, float)) or str(x).replace('.','',1).isdigit() else str(x))
     result_data=pd.merge(planning_data[['SN','RealSlot','TestStatus','PartNumber']], real_data,  how='left', left_on=['SN','RealSlot'], right_on = ['sn',"slot"])
     if result_data['sn'].isnull().any() or result_data['slot'].isnull().any():
         print("Host has no matching slot "+slot)
@@ -677,22 +677,11 @@ def FirstStepModule(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db
             netConf = NetConf(IpHost, UserName, PassWord)
             print("Step 1.2: raw log: ... Waiting")
             result_write_file=""
-            int_check='xe' if module_throughput.startswith(('XFP','SFPP')) else \
-                 ('et' if module_throughput.startswith(('QSFP','QDD')) else \
-                 ('ge' if module_throughput.startswith('SFP') else None))
+            int_check='xe' if module_throughput.strip().startswith(('XFP','SFPP')) else \
+                 'et' if module_throughput.strip().startswith(('QSFP','QDD')) else \
+                 'ge' if module_throughput.strip().startswith('SFP') else None
             for command in list_command:
                 result_write_file+=apply_command(netConf, command.format(card=str(module_slot.split('/')[0]), int=int_check, module=module_slot), "1.2",hostNamDev)
-            # if '510-2024' in hd:
-            #     for command in ['show chassis hardware models', 'show chassis hardware', "show interface terse media et-{}*".format(str(module_slot.split('/')[0]))]:
-            #         result_write_file+=apply_command(netConf, command, "1.2",hostNamDev)
-            # else:
-            #     result_write_file+=apply_command(netConf, 'show chassis hardware', "1.2",hostNamDev)
-            # if module_throughput.startswith(('XFP','SFPP')):
-            #     result_write_file+=apply_command(netConf,"show interfaces diagnostics optics xe-{}".format(module_slot),"1.2",hostNamDev)
-            # elif module_throughput.startswith(('QSFP','QDD')):
-            #     result_write_file+=apply_command(netConf,"show interfaces diagnostics optics et-{}".format(module_slot),"1.2",hostNamDev)
-            # elif module_throughput.startswith('SFP'):
-            #     result_write_file+=apply_command(netConf,"show interfaces diagnostics optics ge-{}".format(module_slot),"1.2",hostNamDev)
             netConf.close()
             if result_write_file!="":
                 print("Step 1.2: Done: ... Complete")
