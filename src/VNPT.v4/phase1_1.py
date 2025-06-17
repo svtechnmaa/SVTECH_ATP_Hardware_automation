@@ -460,7 +460,7 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
                             paragraph = cell.add_paragraph('Không thực hiện mục này do phân bổ thành phần phần cứng tại trạm không có')
                             paragraph.runs[0].font.size = Pt(12)
                             paragraph.runs[0].font.name = 'Times New Roman'
-                            paragraph.runs[0].alignment = docx.enum.text.WD_PARAGRAPH_ALIGNMENT.CENTER
+                            paragraph.alignment = docx.enum.text.WD_PARAGRAPH_ALIGNMENT.CENTER
             tmp=0
             for item in atp_file.paragraphs:
                 if "Kết quả test" in item.text:
