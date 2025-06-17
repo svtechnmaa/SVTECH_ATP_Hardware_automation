@@ -430,8 +430,6 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
     # listSN['fpc_type_variable'] = '<serial_number_here'+listSN['PartNumber'].apply(lambda x: '_'+re.search("MPC(.*?)-",x).group(1) if re.search("MPC(.*?)-",x) else '').astype(str)+listSN['Throughput'].apply(lambda x:'_'+x if x is not None else '').astype(str)+'>'
     for index, unique_bbbg in unique_bbbg_hd.iterrows():
         print("Generating ATP for BBBG: {}".format(unique_bbbg['tail']))
-        # name_tram=unique_bbbg["name_tram"]
-        # tail=unique_bbbg["tail"]
         bbbg_file=docx.Document(os.path.join(hopdong_dir, unique_bbbg['net'], unique_bbbg["tail"]+'.docx'))
         list_host=bbbg.loc[(bbbg['tail'] == unique_bbbg['tail']) & (bbbg['ma_HD'] == unique_bbbg['ma_HD']) & (bbbg['net'] == unique_bbbg['net'])]['Hostname'].unique()
         unique_bbbg['host_name']=', '.join(listSN.loc[listSN['BBBG'] == unique_bbbg['tail']]['PartNumber'].unique())
@@ -454,9 +452,8 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
                             cell.paragraphs[0].runs[0].font.size = Pt(12)
                             cell.paragraphs[0].runs[0].font.name = 'Times New Roman'
 
-            all_paragraph = atp_file.paragraphs
             tmp=0
-            for item in all_paragraph:
+            for item in atp_file.paragraphs:
                 if "Kết quả test" in item.text:
                     tmp+=1
                     if ('510-2024' in hd or '117-2025' in hd) and (tmp<6 or tmp==7) and listSN.loc[(listSN['BBBG'] == unique_bbbg['tail'])&(listSN['Type']=='chassis')].empty:
@@ -468,6 +465,8 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
                         run.font.name='Times New Roman'
                         run.font.size=Pt(12)
                         move_table_after(new_table, item)
+                    elif ((('510-2024' in hd or '117-2025' in hd) and tmp==8) or ('510-2024' not in hd and '117-2025' not in hd and tmp==2)) and unique_bbbg['host_name']=='MX2000-LC-ADAPTER':
+                        item._element.getparent().remove(item._element)
                     else:
                         for host in list_host:
                             new_table=atp_file.add_table(rows=1, cols=1)
