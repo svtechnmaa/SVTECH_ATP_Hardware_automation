@@ -193,6 +193,7 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd, end_date, sign_tim
                 dict_output_lca=dict()
                 dict_output_module=dict()
                 str_output_module=''
+                str_output_lca=''
                 for log in matching:
                     file_log=open(log,'r')
                     line_index=[]
@@ -240,13 +241,16 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd, end_date, sign_tim
                             output_1+=lines[(line_index[2]-1):]
                         else:
                             output_1+=lines[(line_index[1]-1):]
-                    if all("LCA" in s for s in matching):
+                    elif 'LCA' in log:
+                    # if all("LCA" in s for s in matching):
                         dict_output_lca[fname.stat().st_mtime]=lines
                         dict_output_lca=dict(sorted(dict_output_lca.items()))
-                        output_1=dict_output_lca[list(dict_output_lca.keys())[-1]]
+                        str_output_lca=dict_output_lca[list(dict_output_lca.keys())[-1]]
+                        # output_1=dict_output_lca[list(dict_output_lca.keys())[-1]]
                 # If only have module in host, parse only 1 command show chassis hardware
                 if len(matching)>0 and all('Module' in t for t in matching):
                     output_1=str_output_module+output_1
+                output_1=output_1+str_output_lca
                 #Parsing log linecard, module and lca
                 for line in output_1:
                     if "@" in line and '>' in line:
