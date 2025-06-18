@@ -571,7 +571,7 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
                 time.sleep(3)
 
     print("Step 2.1: Power on chassis. Insert MPC into chassis, verify Linecards are present:... waiting")
-    if '510-2024' in hd or '117-2025' in hd:
+    if '510-2024' in hd or '126-2025' in hd or '117-2025' in hd:
         list_command = ["show chassis hardware models","show system license"]
     else:
         list_command = ["show chassis hardware","show system license"]
