@@ -231,7 +231,7 @@ if ('running' in st.session_state and st.session_state.running) or 'run_id' in s
                     file_name = os.path.basename(base_name)
                     output_dir = os.path.join(conf['OUTPUT_DIR'], file_name)
                     if st.session_state['input_data_phase_1.1']['wipe_atp'] and os.path.exists(os.path.join(output_dir, 'ATP')):
-                        DELETE_DIR(os.path.join(output_dir, 'ATP'))
+                        DELETE_DIR(output_dir)
                     for f in [output_dir, os.path.join(output_dir, 'ATP'), os.path.join(output_dir, 'ATP Template'), os.path.join(output_dir, 'RAW LOG')]:
                         CREATE_EXPORT_DIR(f)
                     config_updates = {
