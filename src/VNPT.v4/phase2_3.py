@@ -192,8 +192,9 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd, end_date, sign_tim
                 output_2=''
                 dict_output_lca=dict()
                 dict_output_module=dict()
-                str_output_module=''
-                str_output_lca=''
+                str_output_module_first=[]
+                str_output_module_last=[]
+                str_output_lca=[]
                 for log in matching:
                     file_log=open(log,'r')
                     line_index=[]
@@ -230,17 +231,15 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd, end_date, sign_tim
                         output_2=dict_output_2[list(dict_output_2.keys())[-1]]
                     elif 'Module' in log:
                         # If only have module in host, get only 1 command show chassis hardware
-                        if not any('FPC' in t for t in matching):
-                            if '510-2024' in hd or '126-2025' in hd:
-                                dict_output_module[fname.stat().st_mtime]=lines[(line_index[0]-1):(line_index[2]-1)]
-                            else:
-                                dict_output_module[fname.stat().st_mtime]=lines[(line_index[0]-1):(line_index[1]-1)]
-                            dict_output_module=dict(sorted(dict_output_module.items()))
-                            str_output_module=dict_output_module[list(dict_output_module.keys())[-1]]
+                        # if not any('FPC' in t for t in matching):
                         if '510-2024' in hd or '126-2025' in hd:
-                            output_1+=lines[(line_index[2]-1):]
+                            dict_output_module[fname.stat().st_mtime]=lines[(line_index[0]-1):(line_index[2]-1)]
+                            str_output_module_last+=lines[(line_index[2]-1):]
                         else:
-                            output_1+=lines[(line_index[1]-1):]
+                            dict_output_module[fname.stat().st_mtime]=lines[(line_index[0]-1):(line_index[1]-1)]
+                            str_output_module_last+=lines[(line_index[1]-1):]
+                        dict_output_module=dict(sorted(dict_output_module.items()))
+                        str_output_module_first=dict_output_module[list(dict_output_module.keys())[-1]]
                     elif 'LCA' in log:
                     # if all("LCA" in s for s in matching):
                         dict_output_lca[fname.stat().st_mtime]=lines
@@ -248,9 +247,9 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd, end_date, sign_tim
                         str_output_lca=dict_output_lca[list(dict_output_lca.keys())[-1]]
                         # output_1=dict_output_lca[list(dict_output_lca.keys())[-1]]
                 # If only have module in host, parse only 1 command show chassis hardware
-                if len(matching)>0 and all('Module' in t for t in matching):
-                    output_1=str_output_module+output_1
-                output_1=output_1+str_output_lca
+                # if len(matching)>0 and all('Module' in t for t in matching):
+                #     output_1=str_output_module+output_1
+                output_1=output_1+str_output_lca+str_output_module_first+str_output_module_last
                 #Parsing log linecard, module and lca
                 for line in output_1:
                     if "@" in line and '>' in line:
