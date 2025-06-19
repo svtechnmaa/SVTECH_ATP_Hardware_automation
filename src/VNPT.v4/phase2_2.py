@@ -623,6 +623,9 @@ def FirstStepModule(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db
         '126-2025':{
             'commands': ['show chassis hardware models', 'show chassis hardware', "show interface terse media et-{card}*", 'show interfaces diagnostics optics et-{module}', "show interface terse media xe-{card}*", 'show interfaces diagnostics optics xe-{module}']
         },
+        '117-2025':{
+            'commands': ['show chassis hardware', "show interface terse media et-{card}*", 'show interfaces diagnostics optics et-{module}']
+        },
         'default':{
             "commands": ['show chassis hardware', "show interfaces diagnostics optics {int}-{module}"]
         }
