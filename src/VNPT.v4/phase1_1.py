@@ -170,8 +170,14 @@ def parse_BBBG(folder_hd):
                 #########Part # ->>>> Mô tả hàng hóa
                 if 'Linecard' in row.cells[table_header['mô tả hàng hóa']].text:
                     throughput= re.search("Linecard (.*)",row.cells[table_header['mô tả hàng hóa']].text, re.I).group(1)
+                elif re.match(r"Card \d+G loại \d+", row.cells[table_header['mô tả hàng hóa']].text, re.I):
+                    match=int(re.search(r"Card \d+G loại (\d+)", row.cells[table_header['mô tả hàng hóa']].text, re.I).group(1))
+                    if match==2:
+                        throughput='400G'
+                    elif match==3:
+                        throughput='200G'
                 if all(row.cells[table_header['serial number']].text!=i for i in exception_element): #serial number not N/A or header
-                    if row.cells[table_header['part #']].text.startswith('MPC'):
+                    if row.cells[table_header['part #']].text.startswith('MPC') or row.cells[table_header['part #']].text.startswith('MX2K-MPC'):
                         SN=row.cells[table_header['serial number']].text
                         list_SN=check_vietnamese(SN)
                         dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['fpc'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text,'Throughput':throughput})
@@ -401,6 +407,17 @@ def set_cell_text(tables, list_keyword, new_data):
                                 paragraph.paragraph_format.space_after = Pt(0)
                                 paragraph.alignment = alignment
 
+def get_first_table_after_heading(doc, heading_text):
+    found_heading = False
+    for block in doc.element.body:
+        if block.tag.endswith('p'):
+            para = block.text
+            if heading_text in para:
+                found_heading = True
+        elif block.tag.endswith('tbl') and found_heading:
+            return doc.tables[[t._element for t in doc.tables].index(block)]
+    return None
+
 def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
     print("Generating atp template")
     if template.endswith('.doc'):
@@ -420,12 +437,12 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
     unique_bbbg_hd=bbbg[['tail', 'net', 'ma_HD','name_tram', 'Người ký INOC trang 1', 'Người ký Netx trang 1', 'Người ký SVT trang 1', 'Người ký INOC chi tiết', 'Người ký SVT chi tiết']].copy().drop_duplicates()
     listSN=pd.read_sql_query("SELECT SN, BBBG, PartNumber, Throughput, Type FROM 'checkSN' where ma_HD=(?)" , conn, params=(hd,))
     listSN['fpc_type_variable'] = listSN.apply(lambda row:
-        "<serial_number_here_MX960>" if re.match(r"MX960(.*)", row['PartNumber']) else
-        "<serial_number_here_MX2020>" if re.match(r"MX2020(.*)", row['PartNumber']) else
-        '<serial_number_here' +
-        ('_' + re.search("MPC(.*?)-", row['PartNumber']).group(1) if re.search("MPC(.*?)-", row['PartNumber']) else '') +
-        ('_' + row['Throughput'] if pd.notna(row['Throughput']) else '') +
-        '>',
+        "serial_number_here_MX960" if re.match(r"MX960(.*)", row['PartNumber']) else
+        "serial_number_here_MX2020" if re.match(r"MX2020(.*)", row['PartNumber']) else
+        'serial_number_here' +
+        ('_' + re.search("MPC(.*?)-", row['PartNumber']).group(1) if re.search("MPC(.*?)-", row['PartNumber'])
+        else '_' + re.search("MX2K-MPC(.*)", row['PartNumber']).group(1) if re.search("MX2K-MPC(.*)", row['PartNumber']) else '') +
+        ('_' + row['Throughput'] if pd.notna(row['Throughput']) else ''),
         axis=1
     )
     # listSN['fpc_type_variable'] = '<serial_number_here'+listSN['PartNumber'].apply(lambda x: '_'+re.search("MPC(.*?)-",x).group(1) if re.search("MPC(.*?)-",x) else '').astype(str)+listSN['Throughput'].apply(lambda x:'_'+x if x is not None else '').astype(str)+'>'
@@ -436,36 +453,41 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
         unique_bbbg['host_name']=', '.join(listSN.loc[listSN['BBBG'] == unique_bbbg['tail']]['PartNumber'].unique())
         atp_file = copy.deepcopy(docx.Document(template))
         has_fpc = any(type_val == 'fpc' for type_val in listSN.loc[listSN['BBBG'] == unique_bbbg['tail'], 'Type'].dropna())
+        has_chassis = not listSN.loc[(listSN['BBBG'] == unique_bbbg['tail'])&(listSN['Type']=='chassis')].empty
         try:
             set_cell_text(tables=atp_file.tables,list_keyword=['host_name','name_tram', 'Người ký INOC trang 1', 'Người ký Netx trang 1', 'Người ký SVT trang 1', 'Người ký INOC chi tiết', 'Người ký SVT chi tiết'], new_data=unique_bbbg)
             for table in atp_file.tables:
                 if table.cell(0,0).paragraphs[0].text == '1_output_here' or table.cell(0,0).paragraphs[0].text == '2_output_here':
                     table._element.getparent().remove(table._element)
             for table in atp_file.tables:
+                update_column_result = False
                 for row in table.rows:
                     for cell in row.cells:
                         if '<serial_number_here' in cell.text:
-                            sn_var=re.findall(r'(<\w*serial_number_here\w*>)',cell.text)[0]
-                            sn=', '.join(listSN.loc[(listSN['BBBG'] == unique_bbbg['tail'])&(listSN['Type'] == 'fpc')&(listSN['fpc_type_variable'] == sn_var)]['SN'].to_list())
+                            sn_var=re.findall(r'<(\w*serial_number_here\w*)>',cell.text)[0]
+                            # sn=', '.join(listSN.loc[(listSN['BBBG'] == unique_bbbg['tail'])&(listSN['Type'] == 'fpc')&(listSN['fpc_type_variable'] == sn_var)]['SN'].to_list())
+                            sn=', '.join(listSN.loc[(listSN['BBBG'] == unique_bbbg['tail'])&(listSN['Type'] == 'fpc')&(listSN['fpc_type_variable'].str.contains(sn_var, na=False))]['SN'].to_list())
                             if sn=='':
                                 cell.text='Trạm không được trang bị.'
                             else:
-                                cell.text=cell.text.replace(sn_var,sn)
+                                cell.text=cell.text.replace(f'<{sn_var}>',sn)
                             cell.paragraphs[0].runs[0].font.size = Pt(12)
                             cell.paragraphs[0].runs[0].font.name = 'Times New Roman'
-                        if 'show system license' in cell.text and not has_fpc:
-                            cell = row.cells[3]
-                            for paragraph in cell.paragraphs:
-                                cell._element.remove(paragraph._element)
-                            paragraph = cell.add_paragraph('Không thực hiện mục này do phân bổ thành phần phần cứng tại trạm không có')
-                            paragraph.runs[0].font.size = Pt(12)
-                            paragraph.runs[0].font.name = 'Times New Roman'
-                            paragraph.alignment = docx.enum.text.WD_PARAGRAPH_ALIGNMENT.CENTER
+                        if ('show system license' in cell.text and not has_fpc) or (any(t in cell.text for t in ['Kiểm tra thành phần card điều khiển', 'Kiểm tra thành phần chuyển mạch', 'Kiểm tra thành phần nguồn', 'Kiểm tra thành phần Fantray', 'Kiểm tra thành phần Craft interface', 'khởi động lại card điều khiển']) and not has_chassis):
+                            update_column_result=True
+                    if update_column_result:
+                        cell = row.cells[3]
+                        for paragraph in cell.paragraphs:
+                            cell._element.remove(paragraph._element)
+                        paragraph = cell.add_paragraph('Không thực hiện mục này do phân bổ thành phần phần cứng tại trạm không có')
+                        paragraph.runs[0].font.size = Pt(12)
+                        paragraph.runs[0].font.name = 'Times New Roman'
+                        paragraph.alignment = docx.enum.text.WD_PARAGRAPH_ALIGNMENT.CENTER
             tmp=0
             for item in atp_file.paragraphs:
                 if "Kết quả test" in item.text:
                     tmp+=1
-                    if ('510-2024' in hd or '117-2025' in hd) and (tmp<6 or tmp==7) and listSN.loc[(listSN['BBBG'] == unique_bbbg['tail'])&(listSN['Type']=='chassis')].empty:
+                    if ('510-2024' in hd or '117-2025' in hd) and (tmp<6 or tmp==7) and not has_chassis:
                         new_table=atp_file.add_table(rows=1, cols=1)
                         set_cell_border( cell = new_table.rows[0].cells[0], **cell_border_style)
                         heading_row = new_table.rows[0].cells
