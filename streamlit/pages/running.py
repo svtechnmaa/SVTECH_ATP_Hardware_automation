@@ -219,20 +219,10 @@ if ('running' in st.session_state and st.session_state.running) or 'run_id' in s
                             file_uploaded[i]=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1'][i].name)
                             with open(file_uploaded[i], "wb") as f:
                                 f.write(st.session_state['input_data_phase_1.1'][i].getbuffer())
-                    # file_ip=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1']['ip'].name)
-                    # with open(file_ip, "wb") as f:
-                    #     f.write(st.session_state['input_data_phase_1.1']['ip'].getbuffer())
-                    # file_mapping=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1']['mapping'].name)
-                    # with open(file_mapping, "wb") as f:
-                    #     f.write(st.session_state['input_data_phase_1.1']['mapping'].getbuffer())
-                    # file_template=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1']['template'].name)
-                    # with open(file_template, "wb") as f:
-                    #     f.write(st.session_state['input_data_phase_1.1']['template'].getbuffer())
                     file_name = os.path.basename(base_name)
                     output_dir = os.path.join(conf['OUTPUT_DIR'], file_name)
                     if st.session_state['input_data_phase_1.1']['wipe_atp'] and os.path.exists(os.path.join(output_dir, 'ATP')):
-                        COPY_DIR(output_dir, os.path.join(conf['OUTPUT_DIR'], f'{file_name}_BACKUP'), dirs_exist_ok=True)
-                        DELETE_DIR(output_dir)
+                        DELETE_DIR(os.path.join(output_dir, 'ATP'))
                     for f in [output_dir, os.path.join(output_dir, 'ATP'), os.path.join(output_dir, 'ATP Template'), os.path.join(output_dir, 'RAW LOG')]:
                         CREATE_EXPORT_DIR(f)
                     config_updates = {

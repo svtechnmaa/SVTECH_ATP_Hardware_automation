@@ -99,9 +99,6 @@ def DELETE_DIR(directory):
     else:
         logging.debug ( 'Directory not existed ' + directory )
 
-def COPY_DIR(src, dst):
-    shutil.copytree(src, dst, dirs_exist_ok=True)
-
 def create_sheet_components(input_vars, phase, value={}):
     for var, var_conf in input_vars.items():
         if var_conf['widget'] == 'file_uploader' and 'xlsx' in var_conf['accept_value']:
@@ -226,7 +223,6 @@ class StreamlitLogger:
         with self.lock:
             return "<br>".join(self.lines)
 
-
 class TimestampStdoutWrapper:
     def __init__(self, original_stdout, streamlit_logger):
         self.original_stdout = original_stdout
@@ -241,7 +237,10 @@ class TimestampStdoutWrapper:
             self.streamlit_logger.write(message_with_time)
 
     def flush(self):
-        self.original_stdout.flush()
+        try:
+            self.original_stdout.flush()
+        except BrokenPipeError:
+            pass
 
 def get_list_hd(database):
     conn = sqlite3.connect(database)
