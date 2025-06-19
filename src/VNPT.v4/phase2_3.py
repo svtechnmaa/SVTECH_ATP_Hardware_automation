@@ -141,6 +141,52 @@ def set_cell_border(cell: _Cell, **kwargs):
                 if key in edge_data:
                     element.set(qn('w:{}'.format(key)), str(edge_data[key]))
 
+def delete_paragraph_and_matching_tables(doc):
+    """
+    Delete tables where cell(0,0) matches 'Output-<number>-<anything>'
+    and the paragraph immediately before each matching table.
+    
+    Args:
+        doc (Document): python-docx Document object
+    
+    Returns:
+        Document: Modified Document object
+    """
+    pattern = re.compile(r'^Output-\d+-.*$')
+    deleted_tables_info = []
+    body = doc.element.body
+    i = 0
+    while i < len(body):
+        elem = body[i]
+        if elem.tag.endswith('tbl'):
+            table_index = sum(1 for e in body[:i+1] if e.tag.endswith('tbl')) - 1
+            if table_index < len(doc.tables):
+                table = doc.tables[table_index]
+                try:
+                    cell_text = table.cell(0, 0).text.strip()
+                    if pattern.match(cell_text):
+                        deleted_tables_info.append(cell_text)
+                        if elem.getparent() is body:
+                            body.remove(elem)
+                        else:
+                            print(f"Warning: Table with cell(0,0) '{cell_text}' is not a direct child of body, skipping table deletion.")
+                        if i > 0 and body[i-1].tag.endswith('p'):
+                            if body[i-1].getparent() is body:
+                                body.remove(body[i-1])
+                                i -= 1
+                            else:
+                                print(f"Warning: Paragraph before table '{cell_text}' is not a direct child of body, skipping paragraph deletion.")
+                except IndexError:
+                    pass
+        i += 1
+
+    # Print deleted tables for verification
+    if deleted_tables_info:
+        print("Deleted the following empty tables (and their preceding paragraphs, if any):")
+        for i, cell_text in enumerate(deleted_tables_info):
+            print(f"Table {i+1}: Cell(0,0) text = {cell_text}")
+    return doc
+
 def write_atp(atp_template, list_log_file, atp_file_path, hd, end_date, sign_time):
     atp_file=copy.deepcopy(docx.Document(atp_template))
     try:
@@ -247,8 +293,6 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd, end_date, sign_tim
                         str_output_lca=dict_output_lca[list(dict_output_lca.keys())[-1]]
                         # output_1=dict_output_lca[list(dict_output_lca.keys())[-1]]
                 # If only have module in host, parse only 1 command show chassis hardware
-                # if len(matching)>0 and all('Module' in t for t in matching):
-                #     output_1=str_output_module+output_1
                 output_1=output_1+str_output_lca+str_output_module_first+str_output_module_last
                 #Parsing log linecard, module and lca
                 for line in output_1:
@@ -316,6 +360,7 @@ def write_atp(atp_template, list_log_file, atp_file_path, hd, end_date, sign_tim
         #             table.cell(1,3).paragraphs[0].alignment = 1 # for left, 1 for center, 2 right, 3 justify ....
         #         if 'License name' in table.cell(0,0).text:
         #             table._element.getparent().remove(table._element)
+        delete_paragraph_and_matching_tables(atp_file)
         atp_file.save(atp_file_path)
     except Exception as exp:
         logging.exception(exp)
