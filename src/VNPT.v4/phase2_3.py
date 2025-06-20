@@ -387,12 +387,13 @@ def main():
     args = PARSE_ARGS ( )
     database=os.path.join(args.output_dir,args.database_name)
     conn = sqlite3.connect(database)
-    placeholders = ','.join('?' * len(args.bbbg))
-    query = f"SELECT 'tail', 'Ngày kết thúc', 'Thời gian ký' FROM 'BBBG' WHERE tail IN ({placeholders}) AND ma_HD = ?"
-    bbbg_on_db = pd.read_sql_query(query, conn, params=args.bbbg + [args.hopdong]).drop_duplicates()
-    bbbg_on_db['Ngày kết thúc'] = bbbg_on_db['Ngày kết thúc'].apply(pd.to_datetime)
-    bbbg_on_db['Thời gian ký'] = bbbg_on_db['Thời gian ký'].apply(pd.to_datetime)
-    for bbbg in args.bbbg.split(','):
+    list_bbbg=[bbbg.strip() for bbbg in args.bbbg.split(',')]
+    placeholders = ','.join('?' * len(list_bbbg))
+    query = f'SELECT "tail", "Ngày kết thúc", "Thời gian ký" FROM BBBG WHERE tail IN ({placeholders}) AND ma_HD = ?'
+    bbbg_on_db = pd.read_sql_query(query, conn, params=list_bbbg+ [args.hopdong]).drop_duplicates()
+    bbbg_on_db['Ngày kết thúc'] = bbbg_on_db['Ngày kết thúc'].apply(pd.to_datetime, errors='coerce')
+    bbbg_on_db['Thời gian ký'] = bbbg_on_db['Thời gian ký'].apply(pd.to_datetime, errors='coerce')
+    for bbbg in list_bbbg:
     #   =========== LOG INITIATION SEQUENCE
         dt = datetime.now()
         seq = str(dt.strftime("%Y%m%d"))

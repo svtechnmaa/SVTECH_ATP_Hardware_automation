@@ -680,9 +680,13 @@ def FirstStepModule(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db
             netConf = NetConf(IpHost, UserName, PassWord)
             print("Step 1.2: raw log: ... Waiting")
             result_write_file=""
-            int_check='xe' if module_throughput.strip().startswith(('XFP','SFPP')) else \
-                 'et' if module_throughput.strip().startswith(('QSFP','QDD')) else \
-                 'ge' if module_throughput.strip().startswith('SFP') else None
+            int_check=None
+            if any(x in module_throughput for x in ['XFP', 'SFPP']):
+                int_check='xe'
+            elif any(x in module_throughput for x in ['QSFP','QDD']):
+                int_check='et'
+            elif 'SFP' in module_throughput:
+                int_check='ge'
             for command in list_command:
                 result_write_file+=apply_command(netConf, command.format(card=str(module_slot.split('/')[0]), int=int_check, module=module_slot), "1.2",hostNamDev)
             netConf.close()
