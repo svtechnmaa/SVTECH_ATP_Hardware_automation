@@ -396,7 +396,7 @@ def set_cell_text(tables, list_keyword, new_data):
                                 font_name=cell.paragraphs[0].runs[0].font.name
                                 font_size=cell.paragraphs[0].runs[0].font.size
                                 alignment=cell.paragraphs[0].alignment
-                            cell.text=re.sub(r'<{}>'.format(i), new_data[i], cell.text, flags=re.IGNORECASE)
+                            cell.text=re.sub(rf'<{i}>', new_data[i], cell.text, flags=re.IGNORECASE)
                             for paragraph in cell.paragraphs:
                                 paragraph.runs[0].font.size = font_size
                                 paragraph.runs[0].font.name = font_name
@@ -435,6 +435,8 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
                             }
     bbbg=pd.read_sql_query("SELECT * FROM 'BBBG' where ma_HD=(?)" , conn,params=(hd,))
     unique_bbbg_hd=bbbg[['tail', 'net', 'ma_HD','name_tram', 'Người ký INOC trang 1', 'Người ký Netx trang 1', 'Người ký SVT trang 1', 'Người ký INOC chi tiết', 'Người ký SVT chi tiết']].copy().drop_duplicates()
+    unique_bbbg_hd['inoc'] = unique_bbbg_hd['net'].str.extract(r'(?i)net\s*(\d+)', expand=False).where(lambda x: pd.notnull(x), None)
+    unique_bbbg_hd['region'] = unique_bbbg_hd['inoc'].map({'1': 'Bắc','2': 'Nam','3': 'Trung'}).where(pd.notnull, None)
     listSN=pd.read_sql_query("SELECT SN, BBBG, PartNumber, Throughput, Type FROM 'checkSN' where ma_HD=(?)" , conn, params=(hd,))
     listSN['fpc_type_variable'] = listSN.apply(lambda row:
         "serial_number_here_MX960" if re.match(r"MX960(.*)", row['PartNumber']) else
@@ -455,7 +457,7 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
         has_fpc = any(type_val == 'fpc' for type_val in listSN.loc[listSN['BBBG'] == unique_bbbg['tail'], 'Type'].dropna())
         has_chassis = not listSN.loc[(listSN['BBBG'] == unique_bbbg['tail'])&(listSN['Type']=='chassis')].empty
         try:
-            set_cell_text(tables=atp_file.tables,list_keyword=['host_name','name_tram', 'Người ký INOC trang 1', 'Người ký Netx trang 1', 'Người ký SVT trang 1', 'Người ký INOC chi tiết', 'Người ký SVT chi tiết'], new_data=unique_bbbg)
+            set_cell_text(tables=atp_file.tables,list_keyword=['host_name','name_tram', 'inoc', 'region','Người ký INOC trang 1', 'Người ký Netx trang 1', 'Người ký SVT trang 1', 'Người ký INOC chi tiết', 'Người ký SVT chi tiết'], new_data=unique_bbbg)
             for table in atp_file.tables:
                 if table.cell(0,0).paragraphs[0].text == '1_output_here' or table.cell(0,0).paragraphs[0].text == '2_output_here':
                     table._element.getparent().remove(table._element)
