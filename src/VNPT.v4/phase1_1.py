@@ -382,30 +382,83 @@ def delete_column_in_table(table, columns):
     return grid
 
 def set_cell_text(tables, list_keyword, new_data):
-    font_name = 'Times New Roman'
-    font_size = Pt(12)
-    alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.LEFT
     for table in tables:
         for row in table.rows:
             for cell in row.cells:
-                matching=[s for s in list_keyword if '<{}>'.format(s.lower()) in cell.text.lower()]
-                if len(matching)>0:
+                matching = [s for s in list_keyword if '<{}>'.format(s.lower()) in cell.text.lower()]
+                if len(matching) > 0:
                     for i in matching:
-                        if new_data[i]:
-                            if cell.paragraphs and cell.paragraphs[0].runs:
-                                font_name=cell.paragraphs[0].runs[0].font.name
-                                font_size=cell.paragraphs[0].runs[0].font.size
-                                alignment=cell.paragraphs[0].alignment
-                            cell.text=re.sub(rf'<{i}>', new_data[i], cell.text, flags=re.IGNORECASE)
-                            for paragraph in cell.paragraphs:
-                                paragraph.runs[0].font.size = font_size
-                                paragraph.runs[0].font.name = font_name
-                                if i in ['host_name', 'name_tram']:
-                                    paragraph.runs[0].bold=True
-                                paragraph.paragraph_format.left_indent = Pt(0)
-                                paragraph.paragraph_format.space_before = Pt(0)
-                                paragraph.paragraph_format.space_after = Pt(0)
-                                paragraph.alignment = alignment
+                        if new_data.get(i):
+                            # Find the exact paragraph and run containing the placeholder
+                            target_para = None
+                            target_run = None
+                            for j, para in enumerate(cell.paragraphs):
+                                for k, run in enumerate(para.runs):
+                                    if f'<{i}>'.lower() in run.text.lower():
+                                        target_para = cell.paragraphs[j]
+                                        target_run = run
+                                        break
+                                if target_run:
+                                    break
+
+                            if target_para and target_run:
+                                # Capture original styles from the target paragraph and run
+                                alignment = target_para.alignment if target_para.alignment is not None else docx.enum.text.WD_ALIGN_PARAGRAPH.LEFT
+                                name = target_run.font.name if target_run.font.name else 'Times New Roman'
+                                size = target_run.font.size if target_run.font.size else Pt(12)
+                                bold = target_run.font.bold
+                                italic = target_run.font.italic
+                                underline = target_run.font.underline
+
+                                # Perform replacement in the target run
+                                target_run.text = re.sub(rf'<{i}>', new_data[i], target_run.text, flags=re.IGNORECASE)
+
+                                # Reapply styles to the target run and paragraph
+                                target_para.alignment = alignment
+                                f = target_run.font
+                                f.name = name
+                                f.size = size
+                                f.bold = bold
+                                f.italic = italic
+                                f.underline = underline
+    # from docx.oxml.ns import qn
+    # for table in tables:
+    #     for row in table.rows:
+    #         for cell in row.cells:
+    #             matching=[s for s in list_keyword if '<{}>'.format(s.lower()) in cell.text.lower()]
+    #             if len(matching)>0:
+    #                 for i in matching:
+    #                     if new_data[i]:
+                            # for j, para in enumerate(cell.paragraphs):
+                            #     if f'<{i}>'.lower() in para.text.lower():
+                            #         p=cell.paragraphs[j]
+                            # if p:
+                            #     r0 = p.runs[0]
+                            #     alignment = p.alignment
+                            #     name, size, bold, italic, underline = r0.font.name, r0.font.size, r0.font.bold, r0.font.italic, r0.font.underline
+                            #     r0.text = re.sub(rf'<{i}>', new_data[i], r0.text, flags=re.IGNORECASE)
+                            # else:
+                            #     name, size, bold, italic, underline = 'Times New Roman', Pt(12), None, None, None
+                            #     alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.LEFT
+                            # p.alignment = alignment
+                            # f =  p.runs[0]
+                            # f.name, f.size = name, size
+                            # f.bold, f.italic, f.underline = bold, italic, underline
+                            # if cell.paragraphs and cell.paragraphs[0].runs:
+                            #     font_name=cell.paragraphs[0].runs[0].font.name
+                            #     font_size=cell.paragraphs[0].runs[0].font.size
+                            #     alignment=cell.paragraphs[0].alignment
+
+                            # cell.text=re.sub(rf'<{i}>', new_data[i], cell.text, flags=re.IGNORECASE)
+                            # for paragraph in cell.paragraphs:
+                            #     paragraph.runs[0].font.size = font_size
+                            #     paragraph.runs[0].font.name = font_name
+                            #     if i in ['host_name', 'name_tram', 'inoc', 'region']:
+                            #         paragraph.runs[0].bold=True
+                            #     paragraph.paragraph_format.left_indent = Pt(0)
+                            #     paragraph.paragraph_format.space_before = Pt(0)
+                            #     paragraph.paragraph_format.space_after = Pt(0)
+                            #     paragraph.alignment = alignment
 
 def get_first_table_after_heading(doc, heading_text):
     found_heading = False

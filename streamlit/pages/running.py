@@ -23,6 +23,7 @@ import phase1_2
 import phase2_1
 import phase2_2
 import phase2_3
+import phase2_4
 
 ex = Experiment("provision_pipeline", base_dir=".")
 def run_experiment(ex, config_updates, logger, stop_event, phase):
@@ -166,6 +167,17 @@ def run_phase2_3(hopdong, list_bbbg, output_dir, database_name):
         print("[run_phase2_3] Error occurred during execution::: {}".format(e))
         return 0
 
+@ex.command
+def run_phase2_4(hopdong, template, output_dir, database_name):
+    ex.observers = [sql_observer]
+    print("[run_phase2_4] Starting...")
+    try:
+        phase2_4.generating_atp_appearance(hopdong, output_dir, database_name, template)
+        return 1
+    except Exception as e:
+        print("[run_phase2_4] Error occurred during execution::: {}".format(e))
+        return 0
+
 if ('running' in st.session_state and st.session_state.running) or 'run_id' in st.query_params:
     conf = read_conf()
     log_db_path = os.path.join(conf['OUTPUT_DIR'], conf['DB_LOG'])
@@ -279,6 +291,19 @@ if ('running' in st.session_state and st.session_state.running) or 'run_id' in s
                         "database_name": conf['DB_NAME'],
                         "list_bbbg": st.session_state['input_data_phase_2.3']['list_bbbg'],
                         "hopdong": st.session_state['input_data_phase_2.3']['hopdong'],
+                    }
+                elif st.session_state.running_job == '2.4':
+                    file_template=''
+                    if 'template' in st.session_state['input_data_phase_2.4'] and st.session_state['input_data_phase_2.4']['template'] is not None:
+                        file_template=os.path.join(tmp_output_dir, st.session_state['input_data_phase_2.4']['template'].name)
+                        with open(file_template, "wb") as f:
+                            f.write(st.session_state['input_data_phase_2.4']['template'].getbuffer())
+                    ex.observers = [sql_observer]
+                    config_updates={
+                        "output_dir": conf['OUTPUT_DIR'],
+                        "database_name": conf['DB_NAME'],
+                        "template": file_template,
+                        "hopdong": st.session_state['input_data_phase_2.4']['hopdong'],
                     }
                 thread = threading.Thread(target=run_experiment, args=(ex, config_updates, st.session_state.logger, st.session_state.stop_event, st.session_state.running_job))
                 thread.start()

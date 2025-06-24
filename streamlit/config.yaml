@@ -143,6 +143,20 @@ input_vars:
       label: List BBBG
       default: []
       require: True
+  '2.4':
+    hopdong:
+      widget: selectbox
+      accept_value: []
+      label: List hop dong
+      require: True
+    template:
+      widget: file_uploader
+      placeholder: Upload file ATP template
+      accept_value:
+        - doc
+        - docx
+      label: Upload file template
+      require: True
 OUTPUT_DIR: /opt/ATP_output_result
 DB_NAME: database.sqlite
 TEMP_EXTRACT_HD: /var/tmp/atp_vnpt
