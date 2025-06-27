@@ -2,7 +2,10 @@ import logging
 import os
 import sys
 import time
-
+import re
+import pandas as pd
+import docx
+from docx.shared import Pt
 OK = 0
 WARNING = 1
 CRITICAL = 2
@@ -543,3 +546,67 @@ def GET_PYEZ_TABLEVIEW_FORMATTED(dev=None,
                                             include_hostname=include_hostname,
                                             output_format=output_format)
         return result
+
+def set_cell_text(tables, list_keyword, new_data):
+    from html import escape
+    for table in tables:
+        for row in table.rows:
+            for cell in row.cells:
+                matching = [s for s in list_keyword if '<{}>'.format(s.lower()) in cell.text.lower()]
+                if len(matching) > 0:
+                    for i in matching:
+                        if new_data[i] and pd.notna(new_data[i]):
+                            target_para = None
+                            target_run = None
+                            for j, para in enumerate(cell.paragraphs):
+                                # for k, run in enumerate(para.runs):
+                                if escape(f'<{i}>'.lower()) in escape(para.text.lower()):
+                                    target_para = cell.paragraphs[j]
+                                    for k, run in enumerate(para.runs):
+                                        if escape(f'<{i}>'.lower()) in escape(run.text.lower()):
+                                            target_run = para.runs[k]
+                                            break
+                                    if not target_run:
+                                        target_run = target_para.runs[0]
+                                    # target_run = run
+                                    break
+                            if target_para and target_run:
+                                alignment = target_para.alignment if target_para.alignment is not None else docx.enum.text.WD_ALIGN_PARAGRAPH.LEFT
+                                name = target_run.font.name if target_run.font.name else 'Times New Roman'
+                                size = target_run.font.size if target_run.font.size else Pt(12)
+                                bold = target_run.font.bold
+                                italic = target_run.font.italic
+                                underline = target_run.font.underline
+                                target_para.text = re.sub(rf'<{i}>', str(new_data[i]), target_para.text, flags=re.IGNORECASE)
+                                target_para.alignment = alignment
+                                for run in target_para.runs:
+                                    run.font.name = name
+                                    run.font.size = size
+                                    run.font.bold = bold
+                                    run.font.italic = italic
+                                    run.font.underline = underline
+
+                            # cell.text=re.sub(rf'<{i}>', new_data[i], cell.text, flags=re.IGNORECASE)
+                            # for paragraph in cell.paragraphs:
+                            #     paragraph.runs[0].font.size = font_size
+                            #     paragraph.runs[0].font.name = font_name
+                            #     if i in ['host_name', 'name_tram', 'inoc', 'region']:
+                            #         paragraph.runs[0].bold=True
+                            #     paragraph.paragraph_format.left_indent = Pt(0)
+                            #     paragraph.paragraph_format.space_before = Pt(0)
+                            #     paragraph.paragraph_format.space_after = Pt(0)
+                            #     paragraph.alignment = alignment
+
+def strip_df(df):
+    df.columns = df.columns.str.strip()
+    df.update(df.select_dtypes(include=['object']).apply(
+        lambda x: x.str.strip().where(x.notna(), x)
+    ))
+    return df
+
+def MAKE_DIR(dir):
+    if os.path.isdir(dir):
+        print("Directory exists.")
+    else:
+        os.makedirs(dir)
+        print("Directory not exists. Created")

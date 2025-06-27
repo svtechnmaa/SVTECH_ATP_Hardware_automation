@@ -31,25 +31,22 @@ input_vars:
     mapping_sheet:
       widget: empty
       require: False
-    signning:
-      widget: file_uploader
-      placeholder: Upload file signning and time atp info
-      accept_value:
-        - xlsx
-        - csv
-      label: Upload file signning
-      require: False
-    signning_sheet:
-      widget: empty
-      require: False
-    template:
+    template_hw:
       widget: file_uploader
       placeholder: Upload file ATP template
       accept_value:
         - doc
         - docx
-      label: Upload file template
+      label: Upload file template hardware
       require: True
+    template_appearance:
+      widget: file_uploader
+      placeholder: Upload file ATP appearance template
+      accept_value:
+        - doc
+        - docx
+      label: Upload file template appearance
+      require: False
     wipe_atp:
       widget: checkbox
       default: No
@@ -73,6 +70,37 @@ input_vars:
     planningSN_sheet:
       widget: empty
       require: False
+  '1.3':
+    hopdong:
+      widget: selectbox
+      accept_value: []
+      label: List hop dong
+      require: True
+    signning:
+      widget: file_uploader
+      placeholder: Upload file signning and time atp info
+      accept_value:
+        - xlsx
+        - csv
+      label: Upload file signning
+      require: False
+    signning_sheet:
+      widget: empty
+      require: False
+  # '1.4':
+  #   hopdong:
+  #     widget: selectbox
+  #     accept_value: []
+  #     label: List hop dong
+  #     require: True
+  #   template:
+  #     widget: file_uploader
+  #     placeholder: Upload file ATP template
+  #     accept_value:
+  #       - doc
+  #       - docx
+  #     label: Upload file template
+  #     require: True
   '2.1':
     hopdong:
       widget: selectbox
@@ -142,20 +170,6 @@ input_vars:
       accept_value: []
       label: List BBBG
       default: []
-      require: True
-  '2.4':
-    hopdong:
-      widget: selectbox
-      accept_value: []
-      label: List hop dong
-      require: True
-    template:
-      widget: file_uploader
-      placeholder: Upload file ATP template
-      accept_value:
-        - doc
-        - docx
-      label: Upload file template
       require: True
 OUTPUT_DIR: /opt/ATP_output_result
 DB_NAME: database.sqlite

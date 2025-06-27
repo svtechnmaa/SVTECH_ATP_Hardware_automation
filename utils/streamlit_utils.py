@@ -10,6 +10,9 @@ import sqlite3
 import pandas as pd
 import json
 from glob import glob
+import zipfile
+from io import BytesIO
+
 # from sacred import Experiment
 # from sacred.observers import FileStorageObserver, SqlObserver
 # ex = Experiment("provision_pipeline")
@@ -264,6 +267,11 @@ def get_list_sn(database, hd, host):
     conn = sqlite3.connect(database)
     df=pd.read_sql_query("SELECT Hostname, RealSlot, TestStatus, SN, Type FROM 'checkSN' where TestStatus IN ('Installed','Checked without reboot', 'Checked with reboot','Checked') and Hostname=(?) and Type in ('fpc','module','lca','chassis') and ma_HD=(?)" , conn, params=(host,hd))
     df['RealSlot'] = df['RealSlot'].fillna(value='').apply(str)
+    if not df.empty:
+        df['BaseSlot'] = df.apply(lambda row: row['RealSlot'].split('/')[0] if row['Type'] == 'module' and '/' in row['RealSlot'] else None,axis=1)
+        fpc_set = set(df.loc[df['Type'] == 'fpc', ['Hostname', 'RealSlot']].itertuples(index=False, name=None))
+        drop_mask = df.apply(lambda row: row['Type'] == 'module' and (row['Hostname'], row['BaseSlot']) in fpc_set,axis=1)
+        df = df[~drop_mask].drop(columns='BaseSlot')
     df['host-slot'] = df['Hostname']+' - '+df['Type']+ ' '+df['SN']+' - Slot ' + df['RealSlot']+' - '+df['TestStatus']
     return df['host-slot'].unique().tolist()
     # st.session_state[f'{phase}_hostslot_options'] = df['host-slot'].unique().tolist()
@@ -307,6 +315,16 @@ def get_a_run(database, id):
 def get_list_time_bbbg(database, list_bbbg, hd):
     conn = sqlite3.connect(database)
     placeholders = ','.join('?' * len(list_bbbg))
-    query = f"SELECT `tail`, `Ngày kết thúc`, `Thời gian ký` FROM 'BBBG' WHERE tail IN ({placeholders}) AND ma_HD = ?"
+    query = f"SELECT `BBBG`, `Ngày kết thúc`, `Thời gian ký` FROM 'sign_time' WHERE BBBG IN ({placeholders}) AND ma_HD = ?"
     bbbg_on_db = pd.read_sql_query(query, conn, params=list_bbbg + [hd]).drop_duplicates()
     return bbbg_on_db
+
+def zip_files(file_paths):
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for file_path in file_paths:
+            if os.path.exists(file_path):
+                file_name = os.path.basename(file_path)
+                zip_file.write(file_path, file_name)
+    zip_buffer.seek(0)
+    return zip_buffer

@@ -206,8 +206,6 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             print('Error check SN of {}, {}'.format(IpHost,err))
             logging.exception('Error check SN of {}, {}'.format(IpHost,err))
     planning_hardware=pd.read_sql_query("SELECT * FROM 'checkSN' where ma_HD=(?) and Hostname=(?) and Type='fpc' and RealSlot=(?) and (TestStatus='Installed' or TestStatus like 'Checked%')" , conn_db, params=(hd, hostname,slot))
-    planning_time=pd.read_sql_query("""SELECT "Ngày kết thúc", "Thời gian ký" FROM BBBG WHERE ma_HD = ? AND Hostname = ?""", conn_db, params=(hd, hostname)).iloc[0]
-    planning_time[["Ngày kết thúc", "Thời gian ký"]] = planning_time[["Ngày kết thúc", "Thời gian ký"]].apply(pd.to_datetime, errors='coerce')
     result_installed=compare_db_and_pyez(planning_hardware, device_hardware, slot)
     if result_installed.empty:
         logging.exception("Serial Number and Slot not matching with device")

@@ -8,7 +8,6 @@ import logging
 from jnpr.junos import Device, exception
 import sqlite3
 import argparse
-import ast
 import sys
 from datetime import datetime
 import numpy as np

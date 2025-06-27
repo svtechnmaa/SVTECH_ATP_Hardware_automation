@@ -76,7 +76,7 @@ def process_slot_planning(planningSN, output_dir, db_name, hd, planningSN_sheet=
                 planning_db.to_sql("slot_planning", con=conn, schema=None, if_exists='replace', index=False, index_label=None, chunksize=None, dtype=None, method=None)
             planningSN=pd.read_sql_query("SELECT * FROM 'slot_planning'" , conn)
             checkSN=pd.read_sql_query("SELECT * FROM 'checkSN'" , conn)
-            checkSN=pd.merge(checkSN, planningSN,  how='left', left_on=['SN','ma_HD'], right_on = ['SN','ma_HD'])
+            checkSN=pd.merge(strip_df(checkSN), strip_df(planningSN),  how='left', left_on=['SN','ma_HD'], right_on = ['SN','ma_HD'])
             checkSN["Hostname"] = checkSN["Hostname_y"].fillna(checkSN["Hostname_x"])
             checkSN["PlannedSlot"] = checkSN["Slot"].fillna(checkSN["PlannedSlot"])
             checkSN["RealSlot"] = pd.to_numeric(checkSN["RealSlot"])

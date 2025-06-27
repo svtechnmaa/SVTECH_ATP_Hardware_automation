@@ -16,9 +16,10 @@ import argparse
 import os.path
 import sys
 import time
-from docx.table import _Cell
+from docx.table import _Cell, Table
 import numpy as np
 from docx.shared import Inches
+from docx.oxml import OxmlElement
 import random
 current_script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root_dir = os.path.abspath(os.path.join(current_script_dir, '..', '..'))
@@ -152,6 +153,7 @@ def parse_BBBG(folder_hd):
             for para in wordDoc.paragraphs:
                 if "tại trạm" in para.text.lower():
                     name_tram=re.search("tại trạm (.*)",para.text, re.I).group(1)
+                    name_tram=f'Trạm {name_tram}'
                     break
             dict_bbbg_file[hd].append({'tail':tail, 'serial':{'fpc':[], 'mic':[], 'pic':[], 'module':[],'lca':[], 'chassis':[]}, 'net':net, 'name_tram':name_tram})
             table_header={}
@@ -201,9 +203,6 @@ def parse_BBBG(folder_hd):
                         SN = row.cells[table_header['serial number']].text
                         list_SN=check_vietnamese(SN)
                         dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['serial']['module'].append({'listSN':list_SN,'PartNumber':row.cells[table_header['part #']].text,'Throughput':None})
-                #update add data list device (in bbbg)
-                # if row.cells[table_header['Serial Number']].text!='Serial Number' and (row.cells[table_header['ĐVT']].text.lower()=='card' or row.cells[table_header['ĐVT']].text.lower()=='module'):
-                #     dict_bbbg_file[hd][len(dict_bbbg_file[hd])-1]['device'].append(row.cells[table_header['Part #']].text)
     return dict_bbbg_file
 
 def validate_hostname(hostname):
@@ -269,26 +268,11 @@ def add_random_minute_and_second(obj):
     random_second = random.randint(0, 59)
     return obj.replace(hour=0, minute=random_minute, second=random_second)
 
-def parse_signning(signning_file, signning_sheet='Sheet1', header_index=0):
-    print('Parsing signing file')
-    cols=['Tên trạm trên HS/BB', 'VNPT Net X', 'Người ký INOC trang 1', 'Người ký Netx trang 1', 'Người ký SVT trang 1', 'Người ký INOC chi tiết', 'Người ký SVT chi tiết', 'Ngày kết thúc', 'Thời gian ký']
-    if signning_file:
-        if 'xlsx' in os.path.splitext(signning_file)[1].lower():
-            df=pd.read_excel(open(signning_file, 'rb'), sheet_name=signning_sheet, header=header_index, usecols=cols)
-        else:
-            df=pd.read_csv(signning_file, header=header_index, usecols=cols)
-        for col in ['Ngày kết thúc', 'Thời gian ký']:
-            df[col] = pd.to_datetime(df[col], format='%m/%d/%Y', errors='coerce')
-        df['Thời gian ký'] = df['Thời gian ký'].apply(add_random_minute_and_second)
-    else:
-        df=pd.DataFrame(columns=cols)
-    return df
-
-def save_sqlite(output_dir, db_name, dict_bbbg_file, ip_df, mapping_df, sign_df=pd.DataFrame()):
+def save_sqlite(output_dir, db_name, dict_bbbg_file, ip_df, mapping_df):
     print("Save to database")
     database = os.path.join(output_dir,db_name)
     conn = sqlite3.connect(database)
-    bbbg_table = pd.merge(ip_df, mapping_df,  how='inner', left_on=['Hostname'], right_on = ['Hostname'])
+    bbbg_table = pd.merge(strip_df(ip_df), strip_df(mapping_df),  how='inner', left_on=['Hostname'], right_on = ['Hostname'])
     bbbg_df=pd.DataFrame()
     checkSn_table=pd.DataFrame()
     for key in dict_bbbg_file.keys():
@@ -320,9 +304,7 @@ def save_sqlite(output_dir, db_name, dict_bbbg_file, ip_df, mapping_df, sign_df=
     for bbbg in list_bbbg:
         host = ','.join(mapping_df.loc[mapping_df['BBBG'] == bbbg]['Hostname'].tolist())
         checkSn_table.loc[checkSn_table['BBBG'] == bbbg, 'Hostname'] = host
-    bbbg_table = pd.merge(bbbg_table, bbbg_df, how='inner', left_on=['BBBG'], right_on=['tail']).drop(columns=['BBBG'])
-    bbbg_table = pd.merge(bbbg_table, sign_df, how='left', left_on=['name_tram', 'net'], right_on=['Tên trạm trên HS/BB', 'VNPT Net X'])
-    bbbg_table = bbbg_table.drop(columns=['Tên trạm trên HS/BB', 'VNPT Net X'])
+    bbbg_table = pd.merge(strip_df(bbbg_table), strip_df(bbbg_df), how='inner', left_on=['BBBG'], right_on=['tail']).drop(columns=['BBBG'])
     if bbbg_table.empty or checkSn_table.empty:
         print("BBBG table or SN is empty, check your input")
         logging.exception("Merging BBBG table or SN table is empty")
@@ -332,7 +314,7 @@ def save_sqlite(output_dir, db_name, dict_bbbg_file, ip_df, mapping_df, sign_df=
 
     if listOfTables.fetchone()[0]==1 :
         checkSn_table_db=pd.read_sql_query("SELECT TestStatus, InstallationStatus, PlannedSlot, RealSlot, Hostname, BBBG, SN, ma_HD, SN_status_update_timestamp FROM 'checkSN'" , conn)
-        checkSN_result=pd.merge(checkSn_table, checkSn_table_db,  how='left', left_on=['SN', 'BBBG', 'ma_HD'], right_on = ['SN','BBBG', 'ma_HD'])
+        checkSN_result=pd.merge(strip_df(checkSn_table), strip_df(checkSn_table_db),  how='left', left_on=['SN', 'BBBG', 'ma_HD'], right_on = ['SN','BBBG', 'ma_HD'])
         for index, row in checkSN_result.iterrows():
             checkSN_result.loc[index,'SN_status_update_timestamp']=row['SN_status_update_timestamp_x']
             if not pd.isna(row['Hostname_y']) and not row['Hostname_y']=='' and row['TestStatus_y'] in ['Installed','Checked with reboot','Checked without reboot','Checked']:
@@ -350,7 +332,6 @@ def save_sqlite(output_dir, db_name, dict_bbbg_file, ip_df, mapping_df, sign_df=
                 checkSN_result.loc[index,'RealSlot']=row['RealSlot_x']
                 checkSN_result.loc[index,'Hostname']=row['Hostname_x']
         checkSN_result=checkSN_result.drop(columns=['TestStatus_x','InstallationStatus_x','PlannedSlot_x','RealSlot_x','Hostname_x','TestStatus_y','InstallationStatus_y','PlannedSlot_y','RealSlot_y','Hostname_y','SN_status_update_timestamp_y','SN_status_update_timestamp_x'])
-        # Have only one "ma_HD", so just use dict_bbbg_file.keys()[0]
         cur.execute("DELETE FROM 'checkSN' WHERE ma_HD = '{}'".format(list(dict_bbbg_file.keys())[0]))
     else:
         checkSN_result=checkSn_table
@@ -360,9 +341,26 @@ def save_sqlite(output_dir, db_name, dict_bbbg_file, ip_df, mapping_df, sign_df=
     bbbg_exist = cur.execute(''' SELECT count(name) FROM sqlite_master WHERE type='table' AND name='BBBG' ''')
     if bbbg_exist.fetchone()[0] == 1:
         cur.execute("DELETE FROM 'BBBG' WHERE ma_HD = '{}'".format(list(dict_bbbg_file.keys())[0]))
+    sign_table=bbbg_table[['tail', 'name_tram', 'ma_HD', 'net']].rename({'tail': 'BBBG'}, axis=1).drop_duplicates()
+    sign_table[['Người ký INOC trang 1', 'Người ký Netx trang 1', 'Người ký SVT trang 1', 'Người ký INOC chi tiết', 'Người ký SVT chi tiết', 'Ngày kết thúc', 'Thời gian ký', 'Người ký Netx chi tiết', 'Người ký Netx trang 1 ngoại quan','Người ký SVT trang 1 ngoại quan', 'Người ký Netx chi tiết ngoại quan','Người ký SVT chi tiết ngoại quan','Thời gian ký ngoại quan']] = None
+    sign_result=sign_table
+    sign_exist=cur.execute(''' SELECT count(name) FROM sqlite_master WHERE type='table' AND name='sign_time' ''')
+    if sign_exist.fetchone()[0] == 1:
+        sign_table_db=pd.read_sql_query("SELECT * FROM 'sign_time' where ma_HD=(?)" , conn, params=(list(dict_bbbg_file.keys())[0],))
+        if not sign_table_db.empty:
+            sign_result=pd.merge(strip_df(sign_table), strip_df(sign_table_db),  how='left', on=['BBBG', 'net','ma_HD'])
+            x_columns = [col for col in sign_result.columns if col.endswith('_x')]
+            new_columns = {
+                x_col[:-2]: sign_result[x_col[:-2] + '_y'].combine_first(sign_result[x_col])
+                for x_col in x_columns if x_col[:-2] + '_y' in sign_result.columns
+            }
+            sign_result = sign_result.assign(**new_columns)
+            sign_result = sign_result.drop([col for col in sign_result.columns if col.endswith('_x') or col.endswith('_y')], axis=1)
+            cur.execute("DELETE FROM 'sign_time' WHERE ma_HD = '{}'".format(list(dict_bbbg_file.keys())[0]))
     cur.close()
     bbbg_table.to_sql("BBBG", con=conn, schema=None, if_exists='append', index=False, index_label=None, chunksize=None, dtype=None, method=None)
     checkSN_result.to_sql("checkSN", con=conn, schema=None, if_exists='append', index=False, index_label=None, chunksize=None, dtype=None, method=None)
+    sign_result.to_sql("sign_time", con=conn, schema=None, if_exists='append', index=False, index_label=None, chunksize=None, dtype=None, method=None)
 
 def move_table_after(table, paragraph):
     tbl, p = table._tbl, paragraph._p
@@ -381,85 +379,6 @@ def delete_column_in_table(table, columns):
     grid.remove(col_elem)
     return grid
 
-def set_cell_text(tables, list_keyword, new_data):
-    for table in tables:
-        for row in table.rows:
-            for cell in row.cells:
-                matching = [s for s in list_keyword if '<{}>'.format(s.lower()) in cell.text.lower()]
-                if len(matching) > 0:
-                    for i in matching:
-                        if new_data.get(i):
-                            # Find the exact paragraph and run containing the placeholder
-                            target_para = None
-                            target_run = None
-                            for j, para in enumerate(cell.paragraphs):
-                                for k, run in enumerate(para.runs):
-                                    if f'<{i}>'.lower() in run.text.lower():
-                                        target_para = cell.paragraphs[j]
-                                        target_run = run
-                                        break
-                                if target_run:
-                                    break
-
-                            if target_para and target_run:
-                                # Capture original styles from the target paragraph and run
-                                alignment = target_para.alignment if target_para.alignment is not None else docx.enum.text.WD_ALIGN_PARAGRAPH.LEFT
-                                name = target_run.font.name if target_run.font.name else 'Times New Roman'
-                                size = target_run.font.size if target_run.font.size else Pt(12)
-                                bold = target_run.font.bold
-                                italic = target_run.font.italic
-                                underline = target_run.font.underline
-
-                                # Perform replacement in the target run
-                                target_run.text = re.sub(rf'<{i}>', new_data[i], target_run.text, flags=re.IGNORECASE)
-
-                                # Reapply styles to the target run and paragraph
-                                target_para.alignment = alignment
-                                f = target_run.font
-                                f.name = name
-                                f.size = size
-                                f.bold = bold
-                                f.italic = italic
-                                f.underline = underline
-    # from docx.oxml.ns import qn
-    # for table in tables:
-    #     for row in table.rows:
-    #         for cell in row.cells:
-    #             matching=[s for s in list_keyword if '<{}>'.format(s.lower()) in cell.text.lower()]
-    #             if len(matching)>0:
-    #                 for i in matching:
-    #                     if new_data[i]:
-                            # for j, para in enumerate(cell.paragraphs):
-                            #     if f'<{i}>'.lower() in para.text.lower():
-                            #         p=cell.paragraphs[j]
-                            # if p:
-                            #     r0 = p.runs[0]
-                            #     alignment = p.alignment
-                            #     name, size, bold, italic, underline = r0.font.name, r0.font.size, r0.font.bold, r0.font.italic, r0.font.underline
-                            #     r0.text = re.sub(rf'<{i}>', new_data[i], r0.text, flags=re.IGNORECASE)
-                            # else:
-                            #     name, size, bold, italic, underline = 'Times New Roman', Pt(12), None, None, None
-                            #     alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.LEFT
-                            # p.alignment = alignment
-                            # f =  p.runs[0]
-                            # f.name, f.size = name, size
-                            # f.bold, f.italic, f.underline = bold, italic, underline
-                            # if cell.paragraphs and cell.paragraphs[0].runs:
-                            #     font_name=cell.paragraphs[0].runs[0].font.name
-                            #     font_size=cell.paragraphs[0].runs[0].font.size
-                            #     alignment=cell.paragraphs[0].alignment
-
-                            # cell.text=re.sub(rf'<{i}>', new_data[i], cell.text, flags=re.IGNORECASE)
-                            # for paragraph in cell.paragraphs:
-                            #     paragraph.runs[0].font.size = font_size
-                            #     paragraph.runs[0].font.name = font_name
-                            #     if i in ['host_name', 'name_tram', 'inoc', 'region']:
-                            #         paragraph.runs[0].bold=True
-                            #     paragraph.paragraph_format.left_indent = Pt(0)
-                            #     paragraph.paragraph_format.space_before = Pt(0)
-                            #     paragraph.paragraph_format.space_after = Pt(0)
-                            #     paragraph.alignment = alignment
-
 def get_first_table_after_heading(doc, heading_text):
     found_heading = False
     for block in doc.element.body:
@@ -472,7 +391,7 @@ def get_first_table_after_heading(doc, heading_text):
     return None
 
 def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
-    print("Generating atp template")
+    print("Generating atp hardware template")
     if template.endswith('.doc'):
         subprocess.call(['libreoffice','--headless','--convert-to','docx',"--outdir", os.path.dirname(template), f'{template}'])
         template=template.replace('.doc','.docx')
@@ -486,8 +405,8 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
                             "start": {"sz": 8, "val": "single"},
                             "end": {"sz": 8, "val": "single"},
                             }
-    bbbg=pd.read_sql_query("SELECT * FROM 'BBBG' where ma_HD=(?)" , conn,params=(hd,))
-    unique_bbbg_hd=bbbg[['tail', 'net', 'ma_HD','name_tram', 'Người ký INOC trang 1', 'Người ký Netx trang 1', 'Người ký SVT trang 1', 'Người ký INOC chi tiết', 'Người ký SVT chi tiết']].copy().drop_duplicates()
+    bbbg=pd.read_sql_query("SELECT tail, net, Hostname FROM 'BBBG' where ma_HD=(?)" , conn,params=(hd,))
+    unique_bbbg_hd=pd.read_sql_query("SELECT * FROM 'sign_time' where ma_HD=(?)" , conn,params=(hd,))
     unique_bbbg_hd['inoc'] = unique_bbbg_hd['net'].str.extract(r'(?i)net\s*(\d+)', expand=False).where(lambda x: pd.notnull(x), None)
     unique_bbbg_hd['region'] = unique_bbbg_hd['inoc'].map({'1': 'Bắc','2': 'Nam','3': 'Trung'}).where(pd.notnull, None)
     listSN=pd.read_sql_query("SELECT SN, BBBG, PartNumber, Throughput, Type FROM 'checkSN' where ma_HD=(?)" , conn, params=(hd,))
@@ -502,15 +421,15 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
     )
     # listSN['fpc_type_variable'] = '<serial_number_here'+listSN['PartNumber'].apply(lambda x: '_'+re.search("MPC(.*?)-",x).group(1) if re.search("MPC(.*?)-",x) else '').astype(str)+listSN['Throughput'].apply(lambda x:'_'+x if x is not None else '').astype(str)+'>'
     for index, unique_bbbg in unique_bbbg_hd.iterrows():
-        print("Generating ATP for BBBG: {}".format(unique_bbbg['tail']))
-        bbbg_file=docx.Document(os.path.join(hopdong_dir, unique_bbbg['net'], unique_bbbg["tail"]+'.docx'))
-        list_host=bbbg.loc[(bbbg['tail'] == unique_bbbg['tail']) & (bbbg['ma_HD'] == unique_bbbg['ma_HD']) & (bbbg['net'] == unique_bbbg['net'])]['Hostname'].unique()
-        unique_bbbg['host_name']=', '.join(listSN.loc[listSN['BBBG'] == unique_bbbg['tail']]['PartNumber'].unique())
+        print("Generating ATP hardware for BBBG: {}".format(unique_bbbg['BBBG']))
+        bbbg_file=docx.Document(os.path.join(hopdong_dir, unique_bbbg['net'], unique_bbbg["BBBG"]+'.docx'))
+        list_host=bbbg.loc[(bbbg['tail'] == unique_bbbg['BBBG']) & (bbbg['net'] == unique_bbbg['net'])]['Hostname'].unique()
+        unique_bbbg['host_name']=', '.join(listSN.loc[listSN['BBBG'] == unique_bbbg['BBBG']]['PartNumber'].unique())
         atp_file = copy.deepcopy(docx.Document(template))
-        has_fpc = any(type_val == 'fpc' for type_val in listSN.loc[listSN['BBBG'] == unique_bbbg['tail'], 'Type'].dropna())
-        has_chassis = not listSN.loc[(listSN['BBBG'] == unique_bbbg['tail'])&(listSN['Type']=='chassis')].empty
+        has_fpc = any(type_val == 'fpc' for type_val in listSN.loc[listSN['BBBG'] == unique_bbbg['BBBG'], 'Type'].dropna())
+        has_chassis = not listSN.loc[(listSN['BBBG'] == unique_bbbg['BBBG'])&(listSN['Type']=='chassis')].empty
         try:
-            set_cell_text(tables=atp_file.tables,list_keyword=['host_name','name_tram', 'inoc', 'region','Người ký INOC trang 1', 'Người ký Netx trang 1', 'Người ký SVT trang 1', 'Người ký INOC chi tiết', 'Người ký SVT chi tiết'], new_data=unique_bbbg)
+            set_cell_text(tables=atp_file.tables,list_keyword=['host_name','name_tram', 'inoc', 'region', 'Người ký INOC trang 1', 'Người ký Netx trang 1', 'Người ký SVT trang 1', 'Người ký INOC chi tiết', 'Người ký SVT chi tiết', 'Người ký Netx chi tiết', 'Thời gian ký'], new_data=unique_bbbg)
             for table in atp_file.tables:
                 if table.cell(0,0).paragraphs[0].text == '1_output_here' or table.cell(0,0).paragraphs[0].text == '2_output_here':
                     table._element.getparent().remove(table._element)
@@ -520,8 +439,8 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
                     for cell in row.cells:
                         if '<serial_number_here' in cell.text:
                             sn_var=re.findall(r'<(\w*serial_number_here\w*)>',cell.text)[0]
-                            # sn=', '.join(listSN.loc[(listSN['BBBG'] == unique_bbbg['tail'])&(listSN['Type'] == 'fpc')&(listSN['fpc_type_variable'] == sn_var)]['SN'].to_list())
-                            sn=', '.join(listSN.loc[(listSN['BBBG'] == unique_bbbg['tail'])&(listSN['Type'] == 'fpc')&(listSN['fpc_type_variable'].str.contains(sn_var, na=False))]['SN'].to_list())
+                            # sn=', '.join(listSN.loc[(listSN['BBBG'] == unique_bbbg['BBBG'])&(listSN['Type'] == 'fpc')&(listSN['fpc_type_variable'] == sn_var)]['SN'].to_list())
+                            sn=', '.join(listSN.loc[(listSN['BBBG'] == unique_bbbg['BBBG'])&(listSN['Type'] == 'fpc')&(listSN['fpc_type_variable'].str.contains(sn_var, na=False))]['SN'].to_list())
                             if sn=='':
                                 cell.text='Trạm không được trang bị.'
                             else:
@@ -570,7 +489,7 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
                 elif "<input_table>" in item.text:
                     SN_table_index=get_SN_table_index(bbbg_file)
                     if SN_table_index==-1:
-                        print(f'No table DANH MỤC HÀNG HÓA BÀN GIAO TẠI TRẠM in BBBG {unique_bbbg["tail"]}')
+                        print(f'No table DANH MỤC HÀNG HÓA BÀN GIAO TẠI TRẠM in BBBG {unique_bbbg["BBBG"]}')
                         continue
                     table_component=bbbg_file.tables[SN_table_index]
                     table_component.autofit = False
@@ -594,10 +513,10 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
                     paragraph=item.insert_paragraph_before()
                     paragraph._p.addnext(tbl_component)
                     item.text=""
-            pre_file_name ="ATP_"+unique_bbbg["tail"]+".docx"
+            pre_file_name ="ATP_"+unique_bbbg["BBBG"]+".docx"
             atp_file.save(os.path.join(atp_dir,pre_file_name))
         except Exception as ex:
-            print("Exception generating atp bbbg {}::: {}".format(unique_bbbg["tail"], ex))
+            print("Exception generating atp bbbg {}::: {}".format(unique_bbbg["BBBG"], ex))
             logging.exception(ex)
             raise Exception()
 
@@ -638,18 +557,18 @@ def PARSE_ARGS():
                 type=str,
                 help='\n\t\tPlanning IP sheet')
 
-    parser.add_argument(
-                '-s',
-                '--signning',
-                type=str,
-                help='\n\t\tsignning file')
+    # parser.add_argument(
+    #             '-s',
+    #             '--signning',
+    #             type=str,
+    #             help='\n\t\tsignning file')
 
-    parser.add_argument(
-                '-ss',
-                '--signning_sheet',
-                default="Sheet1",
-                type=str,
-                help='\n\t\tsignning file sheet')
+    # parser.add_argument(
+    #             '-ss',
+    #             '--signning_sheet',
+    #             default="Sheet1",
+    #             type=str,
+    #             help='\n\t\tsignning file sheet')
 
     parser.add_argument(
                 '-o',
@@ -659,10 +578,16 @@ def PARSE_ARGS():
                 help='\n\t\tDirectory save file json')
 
     parser.add_argument(
-                '-template',
-                '--template_file',
+                '-th',
+                '--template_hw',
                 type=str,
-                help='\n\t\tTemplate file')
+                help='\n\t\tTemplate card file')
+
+    parser.add_argument(
+                '-ta',
+                '--template_appearance',
+                type=str,
+                help='\n\t\tTemplate appearance file')
 
     parser.add_argument(
                 '-db',
@@ -698,9 +623,78 @@ def read_bbbg_data():
 #   =========== MAIN OPERATION
     bbbg = parse_BBBG(args.hopdong)
     ip_df, mapping_df = parse_mapping(args.ip, args.mapping, args.output_dir, args.mapping_sheet, args.ip_sheet)
-    sign_df=parse_signning(signning_file=args.signning if args.signning else '', signning_sheet=args.signning_sheet, header_index=2)
-    save_sqlite(args.output_dir, args.database_name, bbbg, ip_df, mapping_df, sign_df)
-    generate_atp(args.template_file, args.output_dir, args.hopdong.split("/")[-1], args.database_name,args.hopdong)
+    save_sqlite(args.output_dir, args.database_name, bbbg, ip_df, mapping_df)
+    generate_atp(args.template_hw, args.output_dir, args.hopdong.split("/")[-1], args.database_name,args.hopdong)
+    if args.template_appearance:
+            generating_atp_appearance(args.hopdong.split("/")[-1], args.output_dir, args.database_name, args.template_appearance, args.hopdong)
+    print('Done')
+
+def generating_atp_appearance(hopdong, output_dir, database_name, template, hopdong_dir):
+    from docx.oxml.ns import qn
+    MAKE_DIR(os.path.join(output_dir, hopdong,'ATP Appearance'))
+    if template.endswith('.doc'):
+        subprocess.call(['libreoffice','--headless','--convert-to','docx',"--outdir", os.path.dirname(template), f'{template}'])
+        template=template.replace('.doc','.docx')
+    conn = sqlite3.connect(os.path.join(output_dir, database_name))
+    unique_bbbgs_hd=pd.read_sql_query("SELECT * FROM 'sign_time' where ma_HD=(?)" , conn,params=(hopdong,))
+    unique_bbbgs_hd['inoc'] = unique_bbbgs_hd['net'].str.extract(r'(?i)net\s*(\d+)', expand=False).where(lambda x: pd.notnull(x), None)
+    unique_bbbgs_hd['region'] = unique_bbbgs_hd['inoc'].map({'1': 'Bắc','2': 'Nam','3': 'Trung'}).where(pd.notnull, None)
+    listSN=pd.read_sql_query("SELECT BBBG, PartNumber, Type FROM 'checkSN' where ma_HD=(?)" , conn, params=(hopdong,))
+    desired_columns = ['STT', 'Part #', 'Mô tả hàng hóa', 'ĐVT', 'SL', 'Serial Number']
+    normalized_desired = [c.replace(' ', '').lower() for c in desired_columns]
+    new_desired_columns=['STT','Ký mã hiệu sản phẩm','Tên hàng hóa và đặc tính kỹ thuật','ĐVT','SL','Serial Number']
+    for index, unique_bbbg in unique_bbbgs_hd.iterrows():
+        print("Generating ATP appearance for BBBG: {}".format(unique_bbbg['BBBG']))
+        try:
+            atp_hardware_template_file=docx.Document(os.path.join(hopdong_dir, unique_bbbg['net'], unique_bbbg["BBBG"]+'.docx'))
+            atp_appearance_template_file = copy.deepcopy(docx.Document(template))
+            unique_bbbg['host_name']=', '.join(listSN.loc[listSN['BBBG'] == unique_bbbg['BBBG']]['PartNumber'].unique())
+            unique_bbbg['hardware']=', '.join(['linecard' if x.lower() == 'fpc' else x.lower() for x in listSN.loc[listSN['BBBG'] == unique_bbbg['BBBG']]['Type'].unique()])
+            set_cell_text(tables=atp_appearance_template_file.tables,list_keyword=['host_name','name_tram', 'inoc', 'Người ký Netx trang 1 ngoại quan','Người ký SVT trang 1 ngoại quan', 'Người ký Netx chi tiết ngoại quan','Người ký SVT chi tiết ngoại quan','Thời gian ký ngoại quan', 'hardware'], new_data=unique_bbbg)
+            for item in atp_appearance_template_file.paragraphs:
+                if "<input_table>" in item.text:
+                    SN_table_index=get_SN_table_index(atp_hardware_template_file)
+                    if SN_table_index==-1:
+                        print(f'No table DANH MỤC HÀNG HÓA BÀN GIAO TẠI TRẠM in ATP Template BBBG {unique_bbbg["tail"]}')
+                        break
+                    table_component=atp_hardware_template_file.tables[SN_table_index]
+                    table_component.autofit = False
+                    table_component.preferred_width = Inches(6.2)
+                    table_component.alignment = docx.enum.table.WD_TABLE_ALIGNMENT.CENTER
+                    header_texts = [cell.text.strip() for cell in table_component.rows[0].cells]
+                    normalized_headers = [h.replace(' ', '').lower() for h in header_texts]
+                    if not all(item in normalized_headers for item in normalized_desired):
+                        missing = [col for col in desired_columns if col.replace(' ', '').lower() not in normalized_headers]
+                        print(f'Missing column(s): {missing} in table DANH MỤC HÀNG HÓA BÀN GIAO TẠI TRẠM in ATP Template BBBG {unique_bbbg["tail"]}')
+                        break
+                    for i in reversed(range(len(header_texts))):
+                        normalized = header_texts[i].replace(' ', '').lower()
+                        if normalized not in normalized_desired:
+                            delete_column_in_table(table_component, i)
+                            del header_texts[i]
+                    for cell, new_text in zip(table_component.rows[0].cells, new_desired_columns):
+                        p = cell.paragraphs[0]
+                        if p.runs:
+                            r0 = p.runs[0]
+                            name, size, bold, italic, underline = r0.font.name or "Times New Roman", r0.font.size or Pt(12), r0.font.bold or False, r0.font.italic or False, r0.font.underline or False
+                        else:
+                            name, size, bold, italic, underline = "Times New Roman", Pt(12), None, None, None
+                        p.clear()
+                        r = p.add_run(new_text)
+                        f = r.font
+                        f.name, f.size, f.bold, f.italic, f.underline = name, size, bold, italic, underline
+                        r._element.rPr.rFonts.set(qn('w:eastAsia'), name)
+
+                    tbl_component = copy.deepcopy(table_component._tbl)
+                    set_table_font(table=Table(tbl_component, table_component._parent), font_name=name, font_size=size)
+                    paragraph=item.insert_paragraph_before()
+                    paragraph._p.addnext(tbl_component)
+                    item.text=""
+            atp_appearance_template_file.save(os.path.join(output_dir, hopdong,'ATP Appearance',"ATP_"+unique_bbbg["BBBG"]+".docx"))
+        except Exception as ex:
+            print("Exception generating atp appearance bbbg {}::: {}".format(unique_bbbg["BBBG"], ex))
+            logging.exception(ex)
+            raise Exception()
 
 if __name__ == '__main__':
     read_bbbg_data()

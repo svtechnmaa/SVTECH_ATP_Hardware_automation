@@ -23,7 +23,7 @@ import phase1_2
 import phase2_1
 import phase2_2
 import phase2_3
-import phase2_4
+import phase1_3
 
 ex = Experiment("provision_pipeline", base_dir=".")
 def run_experiment(ex, config_updates, logger, stop_event, phase):
@@ -37,15 +37,17 @@ def run_experiment(ex, config_updates, logger, stop_event, phase):
         stop_event.set()
 
 @ex.command
-def run_phase1_1(hopdong, ip, mapping, output_dir, database_name, template, ip_sheet, mapping_sheet, wipe_atp, signning, signning_sheet):
+def run_phase1_1(hopdong, ip, mapping, output_dir, database_name, template_hw, template_appearance, ip_sheet, mapping_sheet, wipe_atp, signning, signning_sheet):
     ex.observers = [sql_observer]
     print("[run_phase1_1] Starting...")
     try:
         bbbg = phase1_1.parse_BBBG(hopdong)
         ip_df, mapping_df = phase1_1.parse_mapping(ip, mapping, output_dir, mapping_sheet, ip_sheet)
-        sign_df=phase1_1.parse_signning(signning_file=signning, signning_sheet=signning_sheet, header_index=2)
-        phase1_1.save_sqlite(output_dir, database_name, bbbg, ip_df, mapping_df, sign_df)
-        phase1_1.generate_atp(template, output_dir, hopdong.split("/")[-1], database_name, hopdong)
+        # sign_df=phase1_1.parse_signning(signning_file=signning, signning_sheet=signning_sheet, header_index=2)
+        phase1_1.save_sqlite(output_dir, database_name, bbbg, ip_df, mapping_df)
+        phase1_1.generate_atp(template_hw, output_dir, hopdong.split("/")[-1], database_name, hopdong)
+        if template_appearance:
+            phase1_1.generating_atp_appearance(hopdong.split("/")[-1], output_dir, database_name, template_appearance, hopdong)
         print('Done')
         return 1
     except Exception as e:
@@ -61,6 +63,17 @@ def run_phase1_2(planningSN, planningSN_sheet, output_dir, database_name, hopdon
         return 1
     except Exception as e:
         print("[run_phase1_2] Error occurred during execution::: {}".format(e))
+        return 0
+
+@ex.command
+def run_phase1_3(signning, signning_sheet, output_dir, database_name, hopdong):
+    ex.observers = [sql_observer]
+    print("[run_phase1_3] Starting...")
+    try:
+        phase1_3.process_signning(hopdong=hopdong, signning=signning, output_dir=output_dir, database_name=database_name, signning_sheet=signning_sheet, header_index=2)
+        return 1
+    except Exception as e:
+        print("[run_phase1_3] Error occurred during execution::: {}".format(e))
         return 0
 
 @ex.command
@@ -160,23 +173,23 @@ def run_phase2_3(hopdong, list_bbbg, output_dir, database_name):
         bbbg_on_db['Ngày kết thúc'] = bbbg_on_db['Ngày kết thúc'].apply(pd.to_datetime, errors='coerce')
         bbbg_on_db['Thời gian ký'] = bbbg_on_db['Thời gian ký'].apply(pd.to_datetime, errors='coerce')
         for bbbg in list_bbbg:
-            bbbg_info=bbbg_on_db[bbbg_on_db['tail'] == bbbg].iloc[0]
+            bbbg_info=bbbg_on_db[bbbg_on_db['BBBG'] == bbbg].iloc[0]
             phase2_3.export_atp(bbbg,hopdong,output_dir, bbbg_info['Ngày kết thúc'], bbbg_info['Thời gian ký'])
         return 1
     except Exception as e:
         print("[run_phase2_3] Error occurred during execution::: {}".format(e))
         return 0
 
-@ex.command
-def run_phase2_4(hopdong, template, output_dir, database_name):
-    ex.observers = [sql_observer]
-    print("[run_phase2_4] Starting...")
-    try:
-        phase2_4.generating_atp_appearance(hopdong, output_dir, database_name, template)
-        return 1
-    except Exception as e:
-        print("[run_phase2_4] Error occurred during execution::: {}".format(e))
-        return 0
+# @ex.command
+# def run_phase1_4(hopdong, template, output_dir, database_name):
+#     ex.observers = [sql_observer]
+#     print("[run_phase1_4] Starting...")
+#     try:
+#         phase1_4.generating_atp_appearance(hopdong, output_dir, database_name, template)
+#         return 1
+#     except Exception as e:
+#         print("[run_phase1_4] Error occurred during execution::: {}".format(e))
+#         return 0
 
 if ('running' in st.session_state and st.session_state.running) or 'run_id' in st.query_params:
     conf = read_conf()
@@ -226,7 +239,7 @@ if ('running' in st.session_state and st.session_state.running) or 'run_id' in s
                     else:
                         raise ValueError(f"Unsupported file extension: {file_extension}")
                     file_uploaded={}
-                    for i in ['ip', 'mapping', 'signning', 'template']:
+                    for i in ['ip', 'mapping', 'template_hw', 'template_appearance']:
                         if i in st.session_state['input_data_phase_1.1'] and st.session_state['input_data_phase_1.1'][i] is not None:
                             file_uploaded[i]=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.1'][i].name)
                             with open(file_uploaded[i], "wb") as f:
@@ -243,7 +256,8 @@ if ('running' in st.session_state and st.session_state.running) or 'run_id' in s
                         "mapping": file_uploaded['mapping'],
                         "output_dir": conf['OUTPUT_DIR'],
                         "database_name": conf['DB_NAME'],
-                        "template": file_uploaded['template'],
+                        "template_hw": file_uploaded['template_hw'],
+                        "template_appearance": file_uploaded['template_appearance'] if 'template_appearance' in file_uploaded else None,
                         "ip_sheet": st.session_state['input_data_phase_1.1']['ip_sheet'],
                         "mapping_sheet": st.session_state['input_data_phase_1.1']['mapping_sheet'],
                         'wipe_atp': st.session_state['input_data_phase_1.1']['wipe_atp'],
@@ -261,6 +275,18 @@ if ('running' in st.session_state and st.session_state.running) or 'run_id' in s
                         "planningSN": file_planning,
                         "planningSN_sheet": st.session_state['input_data_phase_1.2']['planningSN_sheet'],
                         "hopdong": st.session_state['input_data_phase_1.2']['hopdong'],
+                    }
+                elif st.session_state.running_job == '1.3':
+                    ex.observers = [sql_observer]
+                    file_signning=os.path.join(tmp_output_dir, st.session_state['input_data_phase_1.3']['signning'].name)
+                    with open(file_signning, "wb") as f:
+                        f.write(st.session_state['input_data_phase_1.3']['signning'].getbuffer())
+                    config_updates={
+                        "output_dir": conf['OUTPUT_DIR'],
+                        "database_name": conf['DB_NAME'],
+                        "signning": file_signning,
+                        "signning_sheet": st.session_state['input_data_phase_1.3']['signning_sheet'] if 'signning_sheet' in st.session_state['input_data_phase_1.3'] else None,
+                        "hopdong": st.session_state['input_data_phase_1.3']['hopdong'],
                     }
                 elif st.session_state.running_job == '2.1':
                     ex.observers = [sql_observer]
@@ -291,19 +317,6 @@ if ('running' in st.session_state and st.session_state.running) or 'run_id' in s
                         "database_name": conf['DB_NAME'],
                         "list_bbbg": st.session_state['input_data_phase_2.3']['list_bbbg'],
                         "hopdong": st.session_state['input_data_phase_2.3']['hopdong'],
-                    }
-                elif st.session_state.running_job == '2.4':
-                    file_template=''
-                    if 'template' in st.session_state['input_data_phase_2.4'] and st.session_state['input_data_phase_2.4']['template'] is not None:
-                        file_template=os.path.join(tmp_output_dir, st.session_state['input_data_phase_2.4']['template'].name)
-                        with open(file_template, "wb") as f:
-                            f.write(st.session_state['input_data_phase_2.4']['template'].getbuffer())
-                    ex.observers = [sql_observer]
-                    config_updates={
-                        "output_dir": conf['OUTPUT_DIR'],
-                        "database_name": conf['DB_NAME'],
-                        "template": file_template,
-                        "hopdong": st.session_state['input_data_phase_2.4']['hopdong'],
                     }
                 thread = threading.Thread(target=run_experiment, args=(ex, config_updates, st.session_state.logger, st.session_state.stop_event, st.session_state.running_job))
                 thread.start()

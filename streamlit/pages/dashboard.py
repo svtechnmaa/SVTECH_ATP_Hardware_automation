@@ -1,6 +1,4 @@
 import streamlit as st
-from io import BytesIO
-import zipfile
 import os
 import sys
 from pathlib import Path
@@ -22,8 +20,7 @@ if os.path.exists(db_path):
     st.subheader('Serial Number ATP Status Dashboard')
     col1, col2, col3, col0 = st.columns([2.5,3,1.5,3])
     with col1:
-        selected_hopdong = st.selectbox(
-            "Hopdong", get_list_hd(database=db_path), label_visibility="visible", key='hopdong_status')
+        selected_hopdong = st.selectbox("Hopdong", get_list_hd(database=db_path), label_visibility="visible", key='hopdong_status')
     with col2:
         bbbg_options = get_list_bbbg(database=db_path, hd=selected_hopdong)
         all_bbbg_options = ["All"] + bbbg_options
@@ -32,6 +29,7 @@ if os.path.exists(db_path):
         status_options=['Unchecked', 'Not-Installed', 'Installed', 'Checked', 'Checked with reboot', 'Checked without reboot']
         all_status_options = ["All"] + status_options
         selected_status = st.multiselect("Status",all_status_options, label_visibility="visible", default=['All'], key='state_status')
+    atp_card_zip_buffer=''
     if selected_bbbg and selected_status:
         query_parts = ["SELECT DISTINCT checkSN.Hostname, checkSN.SN, checkSN.Type, checkSN.RealSlot, checkSN.TestStatus, checkSN.BBBG, checkSN.StatusTestStatus, datetime(checkSN.SN_create_timestamp, 'unixepoch', 'localtime') AS SN_create_timestamp, datetime(checkSN.SN_status_update_timestamp, 'unixepoch', 'localtime') AS SN_status_update_timestamp, checkSN.ma_HD FROM checkSN LEFT JOIN BBBG ON checkSN.BBBG = BBBG.tail AND checkSN.ma_HD = BBBG.ma_HD WHERE checkSN.ma_HD = ?"]
         params = [selected_hopdong]
@@ -50,7 +48,6 @@ if os.path.exists(db_path):
         df=pd.DataFrame([dict(row) for row in results])
         df.insert(loc=0, column="download", value=False)
         edited_df=st.data_editor(df[status_col_order].rename(columns={'SN_status_update_timestamp': 'update_timestamp'}),disabled=[x for x in status_col_order if x!='download'])
-        buffer=''
         not_existed_file=[]
         list_files=[]
         if edited_df["download"].any():
@@ -61,22 +58,32 @@ if os.path.exists(db_path):
                     list_files.append(os.path.join(conf['OUTPUT_DIR'], selected_hopdong, 'ATP Template',f'ATP_{x}.docx'))
                 else:
                     not_existed_file.append(x)
-            buffer = BytesIO()
-            with zipfile.ZipFile(buffer, "w") as zipf:
-                for file in list_files:
-                    zipf.write(file, arcname=Path(file).name)
-            buffer.seek(0)
+            atp_card_zip_buffer = zip_files(list_files)
         if not_existed_file:
             st.error(f"List file atp not existed because no host in: {not_existed_file}")
-        st.download_button(
+    else:
+        edited_df=st.data_editor(pd.DataFrame(columns=status_col_order), disabled=status_col_order)
+    st.download_button(
             label="Download selected files as ZIP",
-            data=buffer,
+            data=atp_card_zip_buffer,
             file_name="selected_files.zip",
             mime="application/zip",
             disabled=not edited_df["download"].any()
         )
-    else:
-        st.dataframe(pd.DataFrame(columns=status_col_order))
+
+    st.subheader('Download ATP ngoai quan')
+    atp_apperance_zip_buffer=''
+    selected_hopdong_download = st.selectbox("Hopdong", get_list_hd(database=db_path), label_visibility="visible", key='hopdong_download')
+    if selected_hopdong_download:
+        atp_apperance_zip_buffer = zip_files(glob(os.path.join(conf['OUTPUT_DIR'], selected_hopdong_download, 'ATP Appearance','*.docx')))
+    st.download_button(
+        label="Download selected files as ZIP",
+        data=atp_apperance_zip_buffer,
+        file_name=f"ATP_ngoai_quan_{selected_hopdong_download}.zip",
+        mime="application/zip",
+        disabled=not selected_hopdong_download
+    )
+
     st.subheader('Serial Number Planning')
     col1, col2, col0 = st.columns([2.5,3,4.5])
     with col1:
@@ -107,7 +114,10 @@ else:
     with col3:
         st.multiselect("Status",[], label_visibility="visible", key='state_status')
     st.dataframe(pd.DataFrame(columns=status_col_order))
+    st.subheader('Download ATP ngoai quan')
+    st.selectbox("Hopdong", [], label_visibility="visible", key='hopdong_download')
     st.subheader('Serial Number Planning')
+    col1, col2, col0 = st.columns([2.5,3,4.5])
     with col1:
         st.selectbox("Hopdong", [], label_visibility="visible", key='hopdong_planning')
     with col2:
