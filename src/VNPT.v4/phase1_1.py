@@ -443,8 +443,11 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
                     for cell in row.cells:
                         if '<serial_number_here' in cell.text:
                             sn_var=re.findall(r'<(\w*serial_number_here\w*)>',cell.text)[0]
+                            if sn_var=='serial_number_here_7E':
+                                sn=', '.join(listSN.loc[(listSN['BBBG'] == unique_bbbg['BBBG'])&(listSN['Type'] == 'fpc')&(listSN['fpc_type_variable'] != 'serial_number_here_7E_10G')&(listSN['fpc_type_variable'].str.contains(sn_var, na=False))]['SN'].to_list())
+                            else:
                             # sn=', '.join(listSN.loc[(listSN['BBBG'] == unique_bbbg['BBBG'])&(listSN['Type'] == 'fpc')&(listSN['fpc_type_variable'] == sn_var)]['SN'].to_list())
-                            sn=', '.join(listSN.loc[(listSN['BBBG'] == unique_bbbg['BBBG'])&(listSN['Type'] == 'fpc')&(listSN['fpc_type_variable'].str.contains(sn_var, na=False))]['SN'].to_list())
+                                sn=', '.join(listSN.loc[(listSN['BBBG'] == unique_bbbg['BBBG'])&(listSN['Type'] == 'fpc')&(listSN['fpc_type_variable'].str.contains(sn_var, na=False))]['SN'].to_list())
                             if sn=='':
                                 cell.text='Trạm không được trang bị.'
                             else:
