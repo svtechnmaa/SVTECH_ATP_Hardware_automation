@@ -105,7 +105,7 @@ def process_signning(hopdong, signning, output_dir, database_name, signning_shee
     sign_table.to_sql("sign_time", con=conn, schema=None, if_exists='append', index=False, index_label=None, chunksize=None, dtype=None, method=None)
     print('Writing atp hardware template')
     list_file_template=glob(os.path.join(output_dir, hopdong, 'ATP Template', '*.docx'))
-    sign_table['Thời gian ký'] = pd.to_datetime(sign_table['Thời gian ký']).dt.strftime('%d/%m/%y')
+    sign_table['Thời gian ký'] = pd.to_datetime(sign_table['Thời gian ký']).dt.strftime('%d/%m/%Y')
     for file in list_file_template:
         bbbg_data=sign_table.loc[sign_table['BBBG'] == Path(file).stem.replace('ATP_', '')]
         if not bbbg_data.empty:
