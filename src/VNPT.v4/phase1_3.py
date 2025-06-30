@@ -6,6 +6,7 @@ from glob import glob
 from docx import Document
 from pathlib import Path
 import sys
+import argparse
 current_script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root_dir = os.path.abspath(os.path.join(current_script_dir, '..', '..'))
 utils_dir_path = os.path.join(project_root_dir, 'utils')
