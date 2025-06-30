@@ -336,11 +336,12 @@ def export_atp(bbbg, hd, output_dir, end_date, sign_time):
     if not os.path.exists(atp_dir):
         os.makedirs(atp_dir)
     print("Writing file ATP docx for "+bbbg+" in hd "+hd)
-    list_log_file=glob(os.path.join(log_dir,bbbg+'*.txt'))
+    list_log_file=glob(os.path.join(log_dir,bbbg+'_*.txt'))
     if len(list_log_file)==0:
         print("No log file in bbbg {}".format(bbbg))
         sys.exit()
-    atp_file=glob(os.path.join(template_dir,'*'+bbbg+'*.docx'))[0]
+    atp_file=os.path.join(template_dir,f'ATP_{bbbg}.docx')
+    # atp_file=glob(os.path.join(template_dir,'*'+bbbg+'*.docx'))[0]
     file_name=os.path.join(atp_dir,atp_file.split("/")[-1])
     write_atp(atp_file, list_log_file, file_name, hd, end_date, sign_time)
     print("Writing file ATP docx for "+bbbg+": Done")
