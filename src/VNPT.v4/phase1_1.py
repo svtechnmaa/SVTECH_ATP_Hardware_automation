@@ -409,6 +409,7 @@ def generate_atp(template, output_dir, hd, db_name, hopdong_dir):
     unique_bbbg_hd=pd.read_sql_query("SELECT * FROM 'sign_time' where ma_HD=(?)" , conn,params=(hd,))
     unique_bbbg_hd['inoc'] = unique_bbbg_hd['net'].str.extract(r'(?i)net\s*(\d+)', expand=False).where(lambda x: pd.notnull(x), None)
     unique_bbbg_hd['region'] = unique_bbbg_hd['inoc'].map({'1': 'Bắc','2': 'Nam','3': 'Trung'}).where(pd.notnull, None)
+    unique_bbbg_hd['Thời gian ký'] = pd.to_datetime(unique_bbbg_hd['Thời gian ký']).dt.strftime('%d/%m/%y')
     listSN=pd.read_sql_query("SELECT SN, BBBG, PartNumber, Throughput, Type FROM 'checkSN' where ma_HD=(?)" , conn, params=(hd,))
     listSN['fpc_type_variable'] = listSN.apply(lambda row:
         "serial_number_here_MX960" if re.match(r"MX960(.*)", row['PartNumber']) else
