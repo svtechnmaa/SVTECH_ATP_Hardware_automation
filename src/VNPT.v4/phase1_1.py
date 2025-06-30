@@ -172,12 +172,15 @@ def parse_BBBG(folder_hd):
                 #########Part # ->>>> Mô tả hàng hóa
                 if 'Linecard' in row.cells[table_header['mô tả hàng hóa']].text:
                     throughput= re.search("Linecard (.*)",row.cells[table_header['mô tả hàng hóa']].text, re.I).group(1)
-                elif re.match(r"Card \d+G loại \d+", row.cells[table_header['mô tả hàng hóa']].text, re.I):
-                    match=int(re.search(r"Card \d+G loại (\d+)", row.cells[table_header['mô tả hàng hóa']].text, re.I).group(1))
-                    if match==2:
-                        throughput='400G'
-                    elif match==3:
-                        throughput='200G'
+                elif re.match(r"Card \d+G(?: loại \d+)?", row.cells[table_header['mô tả hàng hóa']].text, re.I):
+                    if 'loại' in row.cells[table_header['mô tả hàng hóa']].text:
+                        match=int(re.search(r"Card \d+G loại (\d+)", row.cells[table_header['mô tả hàng hóa']].text, re.I).group(1))
+                        if match==2:
+                            throughput='400G'
+                        elif match==3:
+                            throughput='200G'
+                    else:
+                        throughput=re.search(r"Card (\d+G)", row.cells[table_header['mô tả hàng hóa']].text, re.I).group(1)
                 if all(row.cells[table_header['serial number']].text!=i for i in exception_element): #serial number not N/A or header
                     if row.cells[table_header['part #']].text.startswith('MPC') or row.cells[table_header['part #']].text.startswith('MX2K-MPC'):
                         SN=row.cells[table_header['serial number']].text
