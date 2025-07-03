@@ -339,7 +339,7 @@ def export_atp(bbbg, hd, output_dir, end_date, sign_time):
     list_log_file=glob(os.path.join(log_dir,bbbg+'_*.txt'))
     if len(list_log_file)==0:
         print("No log file in bbbg {}".format(bbbg))
-        sys.exit()
+        return
     atp_file=os.path.join(template_dir,f'ATP_{bbbg}.docx')
     # atp_file=glob(os.path.join(template_dir,'*'+bbbg+'*.docx'))[0]
     file_name=os.path.join(atp_dir,atp_file.split("/")[-1])
