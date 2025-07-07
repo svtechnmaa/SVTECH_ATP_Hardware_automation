@@ -101,8 +101,9 @@ def get_module_in_fpc(netconf, slot):
         if not tempData.empty:
             tempData["slot"] = tempData.apply(lambda x: str(re.search("Xcvr (\d+)",x['hardware_name']).group(1)), axis=1)
             tempData['int']= tempData.apply(lambda x: str(x['fpc_slot'].replace(r'FPC ', ''))+'/'+str(x['pic_slot'].replace(r'PIC ', ''))+'/'+str(x['slot']), axis=1)
-            return list(tempData['int'])
-    return []
+            return tempData[['sn', 'int']]
+            # return list(tempData['int'])
+    return pd.DataFrame(columns=['sn', 'int'])
 
 def get_master_RE(netconf):
     device_hardware = GET_PYEZ_TABLEVIEW_FORMATTED(dev=netconf,tableview_file=os.path.join(current_script_dir, '../hardwareTable.yml'),data_type='RE',output_format='dataframe')
@@ -148,6 +149,27 @@ def update_db(conn_db, hostname, SN, status, hd):
     conn_db.commit()
     print("Record Updated successfully")
     cursor.close()
+
+def check_module_in_card(current_modules, conn_db, slot, hd, hostname):
+    planning_module=pd.read_sql_query("SELECT * FROM 'checkSN' where ma_HD=(?) and Hostname=(?) and Type='module' and (TestStatus='Installed' or TestStatus like 'Checked%')" , conn_db, params=(hd, hostname))
+    if not planning_module.empty:
+        planning_module['BaseSlot'] = planning_module.apply(lambda row: row['RealSlot'].split('/')[0] if row['Type'] == 'module' and '/' in row['RealSlot'] else None,axis=1)
+        planning_module=planning_module.loc[planning_module['BaseSlot'] == slot]
+        planning_module.drop(columns=['BaseSlot'], inplace=True)
+        result_data=pd.merge(planning_module, current_modules,  how='left', left_on=['SN','RealSlot'], right_on = ['sn',"int"])
+        unmatched_rows=result_data[result_data['sn'].isna()]
+        matched_rows = result_data[~result_data['sn'].isna()]
+        if not unmatched_rows.empty:
+            print("The following modules are not found in the device for slot "+slot+":")
+            for index, row in unmatched_rows.iterrows():
+                print(f"SN: {row['SN']}, RealSlot: {row['RealSlot']}, TestStatus: {row['TestStatus']}")
+        if not matched_rows.empty:
+            print("The following modules are found in the device for slot "+slot+":")
+            for index, row in matched_rows.iterrows():
+                print(f"SN: {row['SN']}, RealSlot: {row['RealSlot']}, TestStatus: {row['TestStatus']}")
+        return {'existed_modules':matched_rows['SN'].tolist(), 'unmatched_modules':unmatched_rows['SN'].tolist()}
+    else:
+        return {'existed_modules':[], 'unmatched_modules':[]}
 
 def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, slot, hd, request_reboot,hostNamDev,log_dir):
     list_commands_on_hd={
@@ -310,7 +332,9 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
             netConf = NetConf(IpHost, UserName, PassWord)
             result_show=""
             print("Step 1.2: raw log: ... Waiting")
-            list_interface=get_module_in_fpc(netConf,fpc_slot)
+            list_sn_interface=get_module_in_fpc(netConf,fpc_slot)
+            list_modules_state=check_module_in_card(current_modules=list_sn_interface, conn_db=conn_db, slot=fpc_slot, hd=hd, hostname=hostname)
+            list_interface = list_sn_interface['int'].tolist()
             for command in hd_commands['before_reboot']:
                 if '{fpc_slot}' in command:
                     command=command.format(fpc_slot=fpc_slot)
@@ -612,6 +636,10 @@ def FirstStepFPC(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, s
     print("Done writing raw log")
     print("Update db")
     update_db(conn_db, hostname, fpc_sn,new_status, hd)
+    for module in list_modules_state['existed_modules']:
+        update_db(conn_db, hostname, module, 'Checked', hd)
+    for module in list_modules_state['unmatched_modules']:
+        update_db(conn_db, hostname, module, 'Not-Installed', hd)
 
 def FirstStepModule(hostname, pre_file_name, IpHost, UserName, PassWord, conn_db, slot, hd,hostNamDev,log_dir):
     list_commands_on_hd={
