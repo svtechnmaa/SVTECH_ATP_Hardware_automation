@@ -38,6 +38,7 @@ def CheckSn(netConf, hostname):
                 if data_type=='LCA':
                     tempData['slot']=tempData['hardware_name'].apply(lambda x: re.search("ADC (\d+)",x).group(1))
                 elif data_type=='Module':
+                    tempData = tempData.dropna(subset=['hardware_name', 'pic_slot', 'fpc_slot'])
                     tempData['slot']= tempData.apply(lambda x: str(x['fpc_slot'].replace(r'FPC ', ''))+'/'+str(x['pic_slot'].replace(r'PIC ', ''))+'/'+str(x['hardware_name'].replace(r'Xcvr ', '')), axis=1)
                 elif data_type=='Chassis':
                     tempData['slot']=None
