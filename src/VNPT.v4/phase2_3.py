@@ -38,11 +38,11 @@ def replace_starttime(single_line_text, sub_pattern, replacement):
     extract_pattern_modified = r".*?(\d{4}-\d{2}-\d{2}\s+00:\d{2}:\d{2})\s+.*"
     modified_line = re.sub(sub_pattern, replacement, single_line_text)
     extracted_datetime = None
-    if modified_line != single_line_text:
-        match = re.search(extract_pattern_modified, modified_line)
-        if match:
-            modified_datetime_string = match.group(1)
-            extracted_datetime = datetime.strptime(modified_datetime_string, "%Y-%m-%d %H:%M:%S")
+    # if modified_line != single_line_text:
+    match = re.search(extract_pattern_modified, modified_line)
+    if match:
+        modified_datetime_string = match.group(1)
+        extracted_datetime = datetime.strptime(modified_datetime_string, "%Y-%m-%d %H:%M:%S")
     return modified_line + '\n', extracted_datetime
 
 def replace_uptime(single_line_text, end_datetime, start_datetime):
